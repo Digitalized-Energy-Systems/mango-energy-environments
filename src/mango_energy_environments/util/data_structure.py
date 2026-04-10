@@ -1,8 +1,3 @@
-"""Data structure utilities.
-
-Equivalent to MangoEnergyEnvironments.jl/src/util/data_structure.jl.
-"""
-
 from __future__ import annotations
 
 from typing import Any

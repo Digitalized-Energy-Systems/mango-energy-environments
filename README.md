@@ -7,24 +7,16 @@
 
 Energy system simulation environments for [mango-agents](https://github.com/OFFIS-DAI/mango), the Python multi-agent systems framework.
 
-This is the Python port of [MangoEnergyEnvironments.jl](MangoEnergyEnvironments.jl/), replacing:
+Two environments are available:
 
-| Julia | Python |
-|---|---|
-| `Mango.jl` | [`mango-agents`](https://github.com/OFFIS-DAI/mango) |
-| `PowerSystems.jl` + `PowerSimulations.jl` | [`pandapower`](https://pandapower.readthedocs.io/) + `scipy` (HiGHS) |
-| `monee` via `PyCall` | [`monee`](https://pypi.org/project/monee/) (native) |
-
-Currently two environments are available:
-
-- **Multi-energy restoration** — based on `monee`
-- **Power systems scheduling / economic dispatch** — based on `pandapower`
+- **Multi-energy restoration** — based on [`monee`](https://pypi.org/project/monee/)
+- **Power systems scheduling / economic dispatch** — based on [`pandapower`](https://pandapower.readthedocs.io/) + `scipy` (HiGHS)
 
 ---
 
 ## Concept
 
-The general idea of this package is providing concrete environment implementations from the energy domain that plug directly into the mango multi-agent simulation world.  Each environment is an `EnvironmentBehavior` passed to `create_world(environment=DefaultEnvironment(behavior=...))`.  Agents can then be registered and wired up to the physical simulation through *observers* (read current state) and *actions* (mutate state).
+Each environment is an `EnvironmentBehavior` passed to `create_world(environment=DefaultEnvironment(behavior=...))`.  Agents register with the physical simulation through *observers* (read current state) and *actions* (mutate state).
 
 ---
 
@@ -69,8 +61,8 @@ from mango_energy_environments import (
     Failure,
     topology_based_on_grid,
     schedule_failure,
+    fetch_example_net,
 )
-from mango_energy_environments.base.monee import fetch_example_net
 
 
 class BranchFailureHandler(Role):
@@ -81,7 +73,6 @@ class BranchFailureHandler(Role):
     def on_global_event(self, event):
         if isinstance(event, BranchFailureEvent):
             self.counter += 1
-            # notify topology neighbors
             for neighbor in self.context.neighbors():
                 self.context.send_message("Failure attention!", neighbor)
 
@@ -98,18 +89,15 @@ async def run():
 
     world = create_world(start_time=0.0, communication_sim=com_sim, environment=environment)
 
-    # One agent per network node
     for node in monee_net.nodes:
         agent = RoleAgent()
         agent.add_role(BranchFailureHandler())
         world.register(agent, suggested_aid=node.tid)
         world.environment.install(agent, id=node.id, type="node")
 
-    # Mirror physical topology to agent topology
     with create_topology() as topology:
         topology_based_on_grid(monee_net, topology, world)
 
-    # Schedule a branch failure at t = 2 s
     branch = monee_net.branches[2]
     failure = Failure(delay_s=2.0, branch_ids=[branch.id])
 
@@ -146,11 +134,7 @@ from mango.simulation.world import create_world, discrete_step_until
 from mango.simulation.environment import DefaultEnvironment
 from mango.simulation.communication import SimpleCommunicationSimulation
 
-from mango_energy_environments import (
-    PowerSystemsBehavior,
-    PowerUpdateInfo,
-    ComponentRef,
-)
+from mango_energy_environments import PowerSystemsBehavior, PowerUpdateInfo, ComponentRef
 from mango_energy_environments.environments.scheduling import THERMAL, LOAD
 
 
@@ -164,14 +148,12 @@ class LoadMonitor(Role):
 
 
 async def run():
-    # Build a simple pandapower network
     net = pp.create_empty_network()
     b0 = pp.create_bus(net, vn_kv=20)
     b1 = pp.create_bus(net, vn_kv=20)
     g0 = pp.create_gen(net, bus=b0, p_mw=5.0, min_p_mw=0.0, max_p_mw=10.0)
     l0 = pp.create_load(net, bus=b1, p_mw=4.0)
 
-    # Hourly time-series for the generator max output
     start = datetime(2024, 1, 1)
     ts_index = pd.date_range(start, periods=24, freq="h")
     timeseries = {
@@ -191,7 +173,6 @@ async def run():
         environment=environment,
     )
 
-    # Register a monitoring agent for each load
     for ref in behavior.get_components_by_type([LOAD]):
         agent = RoleAgent()
         agent.add_role(LoadMonitor())
@@ -199,10 +180,8 @@ async def run():
         world.environment.install(agent, id=ref)
 
     async with world:
-        # Run 3 hours of simulation (3 × 3600 s)
         await discrete_step_until(world, max_advance_time_s=3 * 3600.0)
 
-    # Solve economic dispatch for current state
     result = behavior.solve_central()
     print(f"Dispatch: success={result['success']}, p_gen={net.gen.at[g0, 'p_mw']:.2f} MW")
 
@@ -217,7 +196,7 @@ asyncio.run(run())
 High-level factory functions for common scenarios:
 
 ```python
-from mango_energy_environments.express import (
+from mango_energy_environments import (
     create_restoration_world,
     create_small_benchmark_restoration_world,
     create_cigre_benchmark_restoration_world,

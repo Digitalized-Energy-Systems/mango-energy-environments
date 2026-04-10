@@ -1,57 +1,33 @@
-"""Monee integration utilities.
-
-Provides thin wrappers around the monee Python API, mirroring the helper
-functions from MangoEnergyEnvironments.jl/src/base/monee.jl.  Because monee is
-a native Python package (not accessed via PyCall), no type conversion is
-needed — all objects are plain Python values.
-"""
+"""Monee integration utilities."""
 
 from __future__ import annotations
 
 import networkx as nx
 
 
-# ---------------------------------------------------------------------------
-# Energy flow
-# ---------------------------------------------------------------------------
-
-
 def energyflow(monee_net):
     """Run steady-state energy flow on *monee_net* and return the result object.
 
-    Wraps :func:`monee.run_energy_flow`.  The returned result object exposes
-    ``.network`` to access the post-flow network state.
+    The returned result object exposes ``.network`` to access the post-flow
+    network state.
     """
     import monee
 
     return monee.run_energy_flow(monee_net)
 
 
-# ---------------------------------------------------------------------------
-# Variable bounds
-# ---------------------------------------------------------------------------
-
-
 def upper(var_or_const):
-    """Return the upper bound of a monee ``Var`` or the value itself for constants.
-
-    Equivalent to ``monee.model.core.upper(value)``.
-    """
+    """Return the upper bound of a monee ``Var``, or the value itself for constants."""
     from monee.model.core import upper as _upper
 
     return _upper(var_or_const)
 
 
 def lower(var_or_const):
-    """Return the lower bound of a monee ``Var`` or the value itself for constants."""
+    """Return the lower bound of a monee ``Var``, or the value itself for constants."""
     from monee.model.core import lower as _lower
 
     return _lower(var_or_const)
-
-
-# ---------------------------------------------------------------------------
-# Graph analysis helpers
-# ---------------------------------------------------------------------------
 
 
 def edge_centrality(net) -> dict:
@@ -67,44 +43,26 @@ def connected_components(net) -> list[set]:
     return list(nx.connected_components(net.graph))
 
 
-# ---------------------------------------------------------------------------
-# Network factories
-# ---------------------------------------------------------------------------
-
-
 def _create_monee_bench():
-    """Create the small monee benchmark multi-energy network."""
     from monee.network import mes
 
     return mes.create_monee_benchmark_net()
 
 
 def _create_mv_multi_cigre():
-    """Create the MV CIGRE multi-energy benchmark network."""
     from monee.network import mes
 
     return mes.create_mv_multi_cigre()
 
 
 def fetch_example_net():
-    """Return the small monee benchmark multi-energy network.
-
-    Equivalent to ``MangoEnergyEnvironments.fetch_example_net()``.
-    """
+    """Return the small monee benchmark multi-energy network."""
     return _create_monee_bench()
 
 
 def fetch_cigre_net():
-    """Return the MV CIGRE multi-energy benchmark network.
-
-    Equivalent to ``MangoEnergyEnvironments.fetch_cigre_net()``.
-    """
+    """Return the MV CIGRE multi-energy benchmark network."""
     return _create_mv_multi_cigre()
-
-
-# ---------------------------------------------------------------------------
-# Load-shedding optimisation
-# ---------------------------------------------------------------------------
 
 
 def solve_load_shedding_optimization(
@@ -115,10 +73,7 @@ def solve_load_shedding_optimization(
     ext_el_grid_bound: tuple[float, float] = (0.0, 1.0),
     ext_gas_grid_bound: tuple[float, float] = (0.0, 1.0),
 ):
-    """Solve load-shedding optimisation with tight operational bounds.
-
-    Parameters mirror the Julia ``solve_load_shedding_optimization`` function.
-    """
+    """Solve load-shedding optimisation with tight operational bounds."""
     import monee
 
     return monee.solve_load_shedding_problem(
@@ -152,8 +107,7 @@ def solve_load_shedding_optimization_relaxed(net):
 def calc_general_resilience_performance(net) -> float:
     """Return the general resilience performance metric for *net*.
 
-    Uses the inverse formulation (``inv=True``) so that higher values mean
-    better resilience, matching the Julia convention.
+    Uses the inverse formulation so that higher values mean better resilience.
     """
     import monee
 

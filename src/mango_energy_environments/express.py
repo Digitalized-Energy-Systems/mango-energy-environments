@@ -1,15 +1,11 @@
 """High-level convenience API.
 
-Translates MangoEnergyEnvironments.jl/src/express.jl to Python, providing
-factory functions that assemble complete simulation worlds from minimal
-parameters.  Import everything from here for typical usage.
+Factory functions that assemble complete simulation worlds from minimal
+parameters.
 
 Example::
 
-    from mango_energy_environments.express import (
-        create_restoration_world,
-        fetch_example_net,
-    )
+    from mango_energy_environments import create_restoration_world, fetch_example_net
 
     net = fetch_example_net()
     world = create_restoration_world(net)
@@ -66,17 +62,8 @@ __all__ = [
     "enable_poisson_com_for_monee",
 ]
 
-# ---------------------------------------------------------------------------
-# Default simulation parameters
-# ---------------------------------------------------------------------------
-
 _DEFAULT_START_DATE = datetime(2024, 8, 1, 0, 0, 0)
 _DEFAULT_STATIC_DELAY_S = 0.02
-
-
-# ---------------------------------------------------------------------------
-# Restoration world factories
-# ---------------------------------------------------------------------------
 
 
 def create_restoration_world(
@@ -97,17 +84,10 @@ def create_restoration_world(
         When ``True`` (default), install Poisson-distributed communication
         delays based on the physical network topology.
     start_date:
-        Simulation start date (used as the clock reference).  The world clock
-        starts at ``0.0`` seconds regardless; this is stored for logging.
+        Simulation start date (stored for logging; the clock starts at 0.0 s).
     static_delay_s:
         Default static message delay used before Poisson communication is
         enabled (or permanently when *with_communication* is ``False``).
-
-    Returns
-    -------
-    SimulationWorld
-        Ready-to-use world.  Register agents and call
-        ``async with world: ...`` to run the simulation.
     """
     from mango.simulation.communication import SimpleCommunicationSimulation
 
@@ -128,11 +108,7 @@ def create_small_benchmark_restoration_world(
     start_date: datetime = _DEFAULT_START_DATE,
     static_delay_s: float = _DEFAULT_STATIC_DELAY_S,
 ) -> SimulationWorld:
-    """Create a restoration world using the small monee benchmark network.
-
-    Convenience wrapper around :func:`create_restoration_world` with
-    :func:`fetch_example_net`.
-    """
+    """Create a restoration world using the small monee benchmark network."""
     monee_net = fetch_example_net()
     return create_restoration_world(
         monee_net,
@@ -148,11 +124,7 @@ def create_cigre_benchmark_restoration_world(
     start_date: datetime = _DEFAULT_START_DATE,
     static_delay_s: float = _DEFAULT_STATIC_DELAY_S,
 ) -> SimulationWorld:
-    """Create a restoration world using the CIGRE MV multi-energy benchmark network.
-
-    Convenience wrapper around :func:`create_restoration_world` with
-    :func:`fetch_cigre_net`.
-    """
+    """Create a restoration world using the CIGRE MV multi-energy benchmark network."""
     monee_net = fetch_cigre_net()
     return create_restoration_world(
         monee_net,
@@ -160,11 +132,6 @@ def create_cigre_benchmark_restoration_world(
         start_date=start_date,
         static_delay_s=static_delay_s,
     )
-
-
-# ---------------------------------------------------------------------------
-# Poisson communication simulation
-# ---------------------------------------------------------------------------
 
 
 def enable_poisson_com_for_monee(
@@ -177,12 +144,10 @@ def enable_poisson_com_for_monee(
 
     Delays are sampled from ``Poisson(base_delay_per_message * hops)`` where
     *hops* is the shortest-path distance (in edges) between two agents in the
-    physical network topology.  Agents connected via coupling-point branches
-    are reachable but with longer expected delays.
+    physical network topology.
 
     Branch agent IDs (``"branch-hi-lo"``) are mapped to their higher-numbered
-    endpoint node's agent ID for routing distance computation, matching the
-    Julia convention in ``enable_poisson_com_for_monee``.
+    endpoint node's agent ID for routing distance computation.
 
     Parameters
     ----------
@@ -191,10 +156,8 @@ def enable_poisson_com_for_monee(
     monee_net:
         The monee network (provides the physical topology).
     base_delay_per_message:
-        Mean delay per hop in seconds.  Delay between two agents is sampled
-        from ``Poisson(base_delay_per_message * path_length)``.
+        Mean delay per hop in seconds.
     """
-    # Build a topology with all nodes and branches (including coupling points)
     monee_to_topo: dict = {}
     aid_graph: nx.Graph = nx.Graph()
 
@@ -205,7 +168,6 @@ def enable_poisson_com_for_monee(
         for child in monee_net.childs_by_ids(node.child_ids):
             if child.tid in world._agents:
                 aids.append(child.tid)
-        # Add a super-node for this monee node; store associated aids
         topo_node = len(aid_graph)
         aid_graph.add_node(topo_node, aids=aids, monee_id=node.id)
         monee_to_topo[node.id] = topo_node
@@ -216,25 +178,19 @@ def enable_poisson_com_for_monee(
         if from_t is not None and to_t is not None:
             aid_graph.add_edge(from_t, to_t)
 
-    # Build agent-level shortest-path dict
     def _label_replacer(aid: str) -> str:
-        """Map branch agent IDs to their higher-node endpoint agent ID."""
         if aid.startswith("branch-"):
             parts = aid.split("-")
-            return f"node-{parts[1]}"  # higher ID is first by convention
+            return f"node-{parts[1]}"
         return aid
 
-    # Collect all agent IDs present in the world
     all_aids = list(world._agents.keys())
 
-    # Build a flat agent→agent distance dict using the aid graph
-    # First, build aid → topo_node mapping
     aid_to_node: dict[str, int] = {}
     for topo_node, data in aid_graph.nodes(data=True):
         for aid in data.get("aids", []):
             aid_to_node[_label_replacer(aid)] = topo_node
 
-    # Shortest paths between all topo nodes (unweighted hop count)
     try:
         all_pairs = dict(nx.all_pairs_shortest_path_length(aid_graph))
     except nx.NetworkXError:
@@ -252,12 +208,11 @@ def enable_poisson_com_for_monee(
         hops = all_pairs.get(s_node, {}).get(r_node, 1)
         return _poisson_sample(base_delay_per_message * hops)
 
-    # Build per-link delay provider dict
     delay_dict: dict[tuple[str | None, str], Callable[[], float]] = {}
     for sender in [None] + all_aids:
         for receiver in all_aids:
             if sender != receiver:
-                s = sender  # capture
+                s = sender
                 r = receiver
                 delay_dict[(s, r)] = lambda _s=s, _r=r: _delay_provider_for(_s, _r)
 
@@ -268,5 +223,4 @@ def enable_poisson_com_for_monee(
 
 
 def _poisson_sample(lam: float) -> float:
-    """Draw a non-negative Poisson-distributed sample with mean *lam*."""
     return max(0.0, random.expovariate(1.0 / lam) if lam > 0 else 0.0)

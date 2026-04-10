@@ -1,8 +1,7 @@
 """mango-energy-environments
 ============================
 
-Energy system simulation environments for **mango-agents**, translated from
-the Julia package ``MangoEnergyEnvironments.jl``.
+Energy system simulation environments for **mango-agents**.
 
 Two environments are provided:
 
@@ -17,7 +16,7 @@ Two environments are provided:
 
 Quick start::
 
-    from mango_energy_environments.express import (
+    from mango_energy_environments import (
         create_restoration_world,
         fetch_example_net,
     )
