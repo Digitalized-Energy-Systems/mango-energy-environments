@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mango-energy-environments"
+version = "0.1.0"
+description = "Energy system simulation environments for mango-agents"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+keywords = ["energy", "simulation", "multi-agent", "power-systems", "restoration"]
+dependencies = [
+    "mango-agents>=2.1",
+    "monee>=1.0",
+    "pandapower>=3.0",
+    "networkx>=3.0",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "highspy>=1.5",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

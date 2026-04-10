@@ -1,0 +1,57 @@
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.installed.cfg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Editable installs (pip install -e .)
+*.dist-info/
+__editable__.*
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+
+# mypy / type checkers
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs
+docs/_build/
+docs/api/
+
+# Temporary files written by tests or solvers (e.g. HiGHS logs)
+*.lp
+*.mps
+highs.log
