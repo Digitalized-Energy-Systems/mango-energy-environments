@@ -12,8 +12,9 @@ def energyflow(monee_net):
     network state.
     """
     import monee
+    from monee.solver import PyomoSolver
 
-    return monee.run_energy_flow(monee_net)
+    return monee.run_energy_flow(monee_net, solver=PyomoSolver())
 
 
 def upper(var_or_const):

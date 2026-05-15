@@ -14,6 +14,7 @@ from .multi_energy_monee import (
     schedule_failure,
     topology_based_on_grid,
     topology_based_on_grid_groups,
+    topology_based_on_sector_grid,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "create_branch_aid",
     "topology_based_on_grid",
     "topology_based_on_grid_groups",
+    "topology_based_on_sector_grid",
 ]

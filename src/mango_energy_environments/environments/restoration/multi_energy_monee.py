@@ -31,6 +31,7 @@ __all__ = [
     "create_branch_aid",
     "topology_based_on_grid",
     "topology_based_on_grid_groups",
+    "topology_based_on_sector_grid",
 ]
 
 
@@ -301,7 +302,29 @@ class RestorationEnvironmentBehavior(Behavior):
             self._net.child_by_id(child_id).model.regulation = regulation_factor
             self._dirty = True
 
-        self._actions[aid] = {"regulate": regulate}
+        actions: dict[str, Callable] = {"regulate": regulate}
+
+        # Reactive-power dispatch: only present on children whose model
+        # carries a ``q_mvar`` attribute (PowerGenerator / PowerLoad /
+        # ExtPowerGrid).  Local Q-V droop roles in scare drive this knob
+        # at the inverter timescale, independent of the LP-level
+        # ``regulation`` setpoint that scales active power.
+        if hasattr(self._net.child_by_id(child_id).model, "q_mvar"):
+
+            def set_q(q_mvar_value: float) -> None:
+                model = self._net.child_by_id(child_id).model
+                # ``q_mvar`` may be a Var (ExtPowerGrid) or a plain
+                # scalar (PowerGenerator).  Setting ``.value`` works for
+                # the former; direct attribute assignment for the latter.
+                if hasattr(model.q_mvar, "value") and not isinstance(model.q_mvar, (int, float)):
+                    model.q_mvar.value = float(q_mvar_value)
+                else:
+                    model.q_mvar = float(q_mvar_value)
+                self._dirty = True
+
+            actions["set_q"] = set_q
+
+        self._actions[aid] = actions
 
     def _install_node(self, aid: str, node_id: Any) -> None:
         def observer() -> dict:
@@ -592,3 +615,119 @@ def _topology_grid_groups_by_sector(
                 topology.add_edge(nid, prev_nid, State.NORMAL)
 
             added_topo_ids.append(nid)
+
+
+def topology_based_on_sector_grid(
+    monee_net,
+    topology: Topology,
+    world,
+    *,
+    sector: str,
+    include_nodes: bool = False,
+    include_childs: bool = True,
+    include_branches: list[str] | None = None,
+) -> None:
+    """Populate *topology* with the physical subgraph of a single energy sector.
+
+    Each monee node whose grid string matches *sector* becomes a topology
+    node holding the node-agent (when *include_nodes* is true), all
+    child-device agents at that node (when *include_childs* is true), and
+    all branch-device agents matching *include_branches* (typically
+    ``["HeatExchanger"]`` so heat exchangers appear as point-devices in
+    the heat sector).
+
+    Edges are added for same-sector branches that are **not** coupling
+    points and whose model name does not contain any of the
+    *include_branches* substrings — those branches represent point-devices
+    rather than network connections.
+
+    The resulting topology is the natural communication overlay for
+    sector-local self-organisation (e.g. label-propagation community
+    formation), preserving physical adjacency without merging sectors at
+    coupling points.
+
+    Parameters
+    ----------
+    monee_net:
+        The monee Network.
+    topology:
+        The mango :class:`~mango.express.topology.Topology` to populate.
+    world:
+        The :class:`~mango.simulation.world.SimulationWorld` containing
+        the registered agents.
+    sector:
+        Substring matched against the node's grid object's string
+        representation (e.g. ``"power"``, ``"gas"``, ``"water"``).
+    include_nodes:
+        If true, the node-agent itself (when registered) is attached to
+        its topology node.  Defaults to false because energy-balance
+        roles are typically installed only on child / branch agents.
+    include_childs:
+        If true, all child-device agents at the node are attached.
+        Defaults to true.
+    include_branches:
+        Branch model-name substrings whose agents are attached to their
+        incident node as point-devices.  Edges spanning these branches
+        are *not* added.
+    """
+    if include_branches is None:
+        include_branches = []
+
+    monee_to_topo: dict[Any, int] = {}
+    added_branch_tids: set = set()
+
+    def _matches(node) -> bool:
+        grid = node.grid
+        if isinstance(grid, list):
+            return False
+        grid_str = str(grid) if not isinstance(grid, str) else grid
+        return sector in grid_str
+
+    def _is_point_device(branch) -> bool:
+        type_name = type(branch.model).__name__
+        return any(sub in type_name for sub in include_branches)
+
+    for node in monee_net.nodes:
+        if not _matches(node):
+            continue
+
+        agents = []
+        if include_nodes and node.tid in world._agents:
+            agents.append(world._agents[node.tid])
+        if include_childs:
+            for child in monee_net.childs_by_ids(node.child_ids):
+                if child.tid in world._agents:
+                    agents.append(world._agents[child.tid])
+        for branch in monee_net.branches_connected_to(node.id):
+            if not _is_point_device(branch):
+                continue
+            if branch.tid in added_branch_tids:
+                continue
+            if branch.tid in world._agents:
+                agents.append(world._agents[branch.tid])
+                added_branch_tids.add(branch.tid)
+
+        # Always add the node — even agentless transit nodes are needed
+        # to keep the physical graph connected for downstream community
+        # detection.  Empty-agent nodes get filtered later when groups
+        # are formed.
+        topo_id = topology.add_node(*agents)
+        monee_to_topo[node.id] = topo_id
+
+    for branch in monee_net.branches:
+        if branch.model.is_cp():
+            continue
+        if _is_point_device(branch):
+            continue
+        from_topo = monee_to_topo.get(branch.from_node_id)
+        to_topo = monee_to_topo.get(branch.to_node_id)
+        if from_topo is None or to_topo is None or from_topo == to_topo:
+            continue
+        if topology.graph.has_edge(from_topo, to_topo):
+            continue
+        state = (
+            State.NORMAL
+            if (branch.active and getattr(branch.model, "on_off", 1) == 1)
+            else State.INACTIVE
+        )
+        topology.add_edge(from_topo, to_topo, state)
