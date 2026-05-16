@@ -1,8 +1,12 @@
 """Monee integration utilities."""
-
 from __future__ import annotations
 
 import networkx as nx
+
+import monee
+from monee.model.core import upper as _upper
+from monee.model.core import lower as _lower
+from monee.network import mes
 
 
 def energyflow(monee_net):
@@ -11,22 +15,18 @@ def energyflow(monee_net):
     The returned result object exposes ``.network`` to access the post-flow
     network state.
     """
-    import monee
-    from monee.solver import PyomoSolver
 
-    return monee.run_energy_flow(monee_net, solver=PyomoSolver())
+    return monee.run_energy_flow(monee_net, solver="gurobi")
 
 
 def upper(var_or_const):
     """Return the upper bound of a monee ``Var``, or the value itself for constants."""
-    from monee.model.core import upper as _upper
 
     return _upper(var_or_const)
 
 
 def lower(var_or_const):
     """Return the lower bound of a monee ``Var``, or the value itself for constants."""
-    from monee.model.core import lower as _lower
 
     return _lower(var_or_const)
 
@@ -45,13 +45,11 @@ def connected_components(net) -> list[set]:
 
 
 def _create_monee_bench():
-    from monee.network import mes
 
     return mes.create_monee_benchmark_net()
 
 
 def _create_mv_multi_cigre():
-    from monee.network import mes
 
     return mes.create_mv_multi_cigre()
 
@@ -75,7 +73,6 @@ def solve_load_shedding_optimization(
     ext_gas_grid_bound: tuple[float, float] = (0.0, 1.0),
 ):
     """Solve load-shedding optimisation with tight operational bounds."""
-    import monee
 
     return monee.solve_load_shedding_problem(
         net,
@@ -92,7 +89,6 @@ def solve_load_shedding_optimization_relaxed(net):
 
     Useful as a feasibility check or warm-start for tighter formulations.
     """
-    import monee
 
     return monee.solve_load_shedding_problem(
         net,
@@ -110,6 +106,5 @@ def calc_general_resilience_performance(net) -> float:
 
     Uses the inverse formulation so that higher values mean better resilience.
     """
-    import monee
 
     return monee.problem.calc_general_resilience_performance(net, inv=True)
