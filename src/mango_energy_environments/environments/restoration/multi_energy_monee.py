@@ -113,6 +113,7 @@ class RestorationEnvironmentBehavior(Behavior):
         on_branch_failure: Callable[[Any], None] = lambda _: None,
         on_node_failure: Callable[[Any], None] = lambda _: None,
         on_custom_failure: Callable[[Any], None] = lambda _: None,
+        energy_flow_cooldown_s: float = 0.1,
     ) -> None:
         self._net = net
         self._net_results = None
@@ -121,6 +122,15 @@ class RestorationEnvironmentBehavior(Behavior):
         self._on_node_failure = on_node_failure
         self._on_custom_failure = on_custom_failure
         self._dirty: bool = False
+        # Energy-flow rate limit.  Each ``regulate``/failure marks the
+        # network dirty; without a cooldown ``on_step`` would re-solve
+        # every simulation step that follows, which dominates wallclock
+        # on large networks.  The cooldown guarantees at most one
+        # ``energyflow`` solve per ``energy_flow_cooldown_s`` of
+        # simulated time; pending dirtiness is preserved and the next
+        # eligible step will catch it up.
+        self._energy_flow_cooldown_s: float = float(energy_flow_cooldown_s)
+        self._last_energy_flow_t: float = float("-inf")
 
         # Sorted list of (trigger_time_s, seq, Failure); seq breaks ties without
         # comparing Failure objects (which don't define __lt__).
@@ -147,6 +157,17 @@ class RestorationEnvironmentBehavior(Behavior):
     def initialize(self, environment: Environment, clock: Clock) -> None:
         logger.debug("RestorationEnvironmentBehavior: running initial energy flow")
         self._net_results = energyflow(self._net)
+        self._last_energy_flow_t = clock.time
+
+    def flush_energy_flow(self) -> None:
+        """Force an immediate energy-flow recompute, bypassing the
+        cooldown.  Use at end-of-simulation (or any other measurement
+        boundary) so observers read post-agent-action state rather than
+        a stale ``_net_results`` cached from a pre-cooldown solve.
+        """
+        logger.debug("RestorationEnvironmentBehavior: forced energy-flow flush")
+        self._net_results = energyflow(self._net)
+        self._dirty = False
 
     def on_step(
         self, environment: Environment, clock: Clock, step_size_s: float
@@ -169,13 +190,20 @@ class RestorationEnvironmentBehavior(Behavior):
             self._handle_failures(environment, triggered)
 
         if self._dirty:
+            since_last = clock.time - self._last_energy_flow_t
+            if since_last < self._energy_flow_cooldown_s:
+                # Cooldown not elapsed; keep ``_dirty`` so the next
+                # eligible step picks it up.
+                return
             logger.debug(
                 "RestorationEnvironmentBehavior: recomputing energy flow "
-                "(t=%.3f, dt=%.3f)",
+                "(t=%.3f, dt=%.3f, since_last=%.3f)",
                 clock.time,
                 step_size_s,
+                since_last,
             )
             self._net_results = energyflow(self._net)
+            self._last_energy_flow_t = clock.time
             self._dirty = False
 
     def install(self, agent, **kwargs) -> None:
