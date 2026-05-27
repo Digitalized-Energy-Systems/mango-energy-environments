@@ -16,7 +16,9 @@ def energyflow(monee_net):
     network state.
     """
 
-    return monee.run_energy_flow(monee_net, solver="gurobi")
+    return monee.run_energy_flow(
+        monee_net, solver="gurobi", exclude_unconnected_nodes=True,
+    )
 
 
 def upper(var_or_const):
