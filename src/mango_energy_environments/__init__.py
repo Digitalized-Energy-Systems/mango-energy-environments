@@ -39,6 +39,7 @@ from mango_energy_environments.environments.restoration import (
     schedule_failure,
     topology_based_on_grid,
     topology_based_on_grid_groups,
+    topology_based_on_sector_grid,
 )
 from mango_energy_environments.environments.scheduling import (
     ComponentRef,
@@ -82,6 +83,7 @@ __all__ = [
     "create_branch_aid",
     "topology_based_on_grid",
     "topology_based_on_grid_groups",
+    "topology_based_on_sector_grid",
     # Scheduling
     "PowerUpdateInfo",
     "ComponentRef",
