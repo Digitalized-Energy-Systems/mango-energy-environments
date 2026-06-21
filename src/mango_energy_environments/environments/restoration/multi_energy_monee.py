@@ -13,6 +13,8 @@ from mango.express.topology import Topology
 from mango.simulation.environment import Behavior, Environment
 from mango.util.clock import Clock
 
+from monee.model.child import ExtHydrGrid
+
 from mango_energy_environments.base.monee import connected_components, energyflow
 
 logger = logging.getLogger(__name__)
@@ -114,6 +116,7 @@ class RestorationEnvironmentBehavior(Behavior):
         on_node_failure: Callable[[Any], None] = lambda _: None,
         on_custom_failure: Callable[[Any], None] = lambda _: None,
         energy_flow_cooldown_s: float = 0.1,
+        energy_flow_max_acts: int = 0,
     ) -> None:
         self._net = net
         self._net_results = None
@@ -122,24 +125,16 @@ class RestorationEnvironmentBehavior(Behavior):
         self._on_node_failure = on_node_failure
         self._on_custom_failure = on_custom_failure
         self._dirty: bool = False
-        # Energy-flow rate limit.  Each ``regulate``/failure marks the
-        # network dirty; without a cooldown ``on_step`` would re-solve
-        # every simulation step that follows, which dominates wallclock
-        # on large networks.  The cooldown guarantees at most one
-        # ``energyflow`` solve per ``energy_flow_cooldown_s`` of
-        # simulated time; pending dirtiness is preserved and the next
-        # eligible step will catch it up.
+        
         self._energy_flow_cooldown_s: float = float(energy_flow_cooldown_s)
         self._last_energy_flow_t: float = float("-inf")
+        self._energy_flow_max_acts: int = int(energy_flow_max_acts)
+        self._acts_since_solve: int = 0
 
-        # Sorted list of (trigger_time_s, seq, Failure); seq breaks ties without
-        # comparing Failure objects (which don't define __lt__).
         self._scheduled_failures: list[tuple[float, int, Failure]] = []
         self._failure_seq: int = 0
 
-        # aid -> Callable[[], dict]
         self._observers: dict[str, Callable[[], dict]] = {}
-        # aid -> {action_name: Callable}
         self._actions: dict[str, dict[str, Callable]] = {}
 
     @property
@@ -159,6 +154,28 @@ class RestorationEnvironmentBehavior(Behavior):
         self._net_results = energyflow(self._net)
         self._last_energy_flow_t = clock.time
 
+    @staticmethod
+    def _accept_or_keep(prev, candidate):
+        """Return *candidate* when the solve succeeded, otherwise keep
+        *prev*.  monee's ``SolverResult`` exposes ``success`` (False on
+        infeasible / non-OK termination); pyomo's ``load_solutions=True``
+        has already pushed a witness / partial solution onto every Var
+        by then, so accepting that result would feed garbage to the
+        ``observe()`` calls until the next successful solve.  Falling
+        back to the last feasible result is the conservative choice
+        and matches the energy_flow_cooldown contract (observers may
+        see a slightly stale state, never an inconsistent one).
+        """
+        if prev is None:
+            return candidate
+        if getattr(candidate, "success", True):
+            return candidate
+        logger.warning(
+            "energyflow infeasible — keeping previous net_results to avoid "
+            "propagating an inadmissible witness solution to observers."
+        )
+        return prev
+
     def flush_energy_flow(self) -> None:
         """Force an immediate energy-flow recompute, bypassing the
         cooldown.  Use at end-of-simulation (or any other measurement
@@ -166,7 +183,10 @@ class RestorationEnvironmentBehavior(Behavior):
         a stale ``_net_results`` cached from a pre-cooldown solve.
         """
         logger.debug("RestorationEnvironmentBehavior: forced energy-flow flush")
-        self._net_results = energyflow(self._net)
+        self._net_results = self._accept_or_keep(
+            self._net_results, energyflow(self._net)
+        )
+        self._acts_since_solve = 0
         self._dirty = False
 
     def on_step(
@@ -191,10 +211,13 @@ class RestorationEnvironmentBehavior(Behavior):
 
         if self._dirty:
             since_last = clock.time - self._last_energy_flow_t
-            if since_last < self._energy_flow_cooldown_s:
-                # Cooldown not elapsed; keep ``_dirty`` so the next
-                # eligible step picks it up.
+            acts_over = (
+                self._energy_flow_max_acts > 0
+                and self._acts_since_solve >= self._energy_flow_max_acts
+            )
+            if since_last < self._energy_flow_cooldown_s and not acts_over:
                 return
+            
             logger.debug(
                 "RestorationEnvironmentBehavior: recomputing energy flow "
                 "(t=%.3f, dt=%.3f, since_last=%.3f)",
@@ -202,8 +225,11 @@ class RestorationEnvironmentBehavior(Behavior):
                 step_size_s,
                 since_last,
             )
-            self._net_results = energyflow(self._net)
+            self._net_results = self._accept_or_keep(
+                self._net_results, energyflow(self._net)
+            )
             self._last_energy_flow_t = clock.time
+            self._acts_since_solve = 0
             self._dirty = False
 
     def install(self, agent, **kwargs) -> None:
@@ -244,6 +270,8 @@ class RestorationEnvironmentBehavior(Behavior):
         fn = self._actions.get(agent_id, {}).get(action)
         if fn is not None:
             fn(*args, **kwargs)
+            if action in ("regulate", "set_q", "set_pressure"):
+                self._acts_since_solve += 1
         else:
             logger.warning(
                 "No action %r registered for agent %r", action, agent_id
@@ -351,6 +379,16 @@ class RestorationEnvironmentBehavior(Behavior):
                 self._dirty = True
 
             actions["set_q"] = set_q
+
+        if isinstance(self._net.child_by_id(child_id).model, ExtHydrGrid):
+
+            def set_pressure(pressure_pu_value: float) -> None:
+                self._net.child_by_id(child_id).model.pressure_pu = float(
+                    pressure_pu_value
+                )
+                self._dirty = True
+
+            actions["set_pressure"] = set_pressure
 
         self._actions[aid] = actions
 

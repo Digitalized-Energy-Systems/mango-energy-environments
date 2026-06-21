@@ -14,6 +14,14 @@ def energyflow(monee_net):
 
     The returned result object exposes ``.network`` to access the post-flow
     network state.
+
+    ``exclude_unconnected_nodes=True`` keeps the LP feasible after a
+    failure that severs a component: without it, monee assembles
+    equations for the disconnected component too and the solver returns
+    "infeasible" while leaving ``regulation`` at the constructor default
+    of 1.0 — which the served-fraction metric then reads as "everything
+    served".  This mirrors the same flag used on the oracle path
+    (see ``experiment/eval/oracle.py``).
     """
 
     return monee.run_energy_flow(
