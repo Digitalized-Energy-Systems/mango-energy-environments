@@ -152,7 +152,7 @@ class TestObserversAndActions:
         environment = DefaultEnvironment(behavior=behavior)
         world = create_world(start_time=0.0, environment=environment)
         agent = RoleAgent()
-        world.register(agent, suggested_aid=f"{ref.element_type}-{ref.index}")
+        world.register(agent, suggested_aid=f"{ref.element_type}-{ref.component_id}")
         return world, behavior, agent, ref
 
     async def test_statics_observer_returns_dict(self, simple_power_net):
@@ -371,7 +371,7 @@ async def test_power_systems_shallow(five_bus_net):
         agent = RoleAgent()
         monitor = PowerLoadMonitoring()
         agent.add_role(monitor)
-        world.register(agent, suggested_aid=f"load-{ref.index}")
+        world.register(agent, suggested_aid=f"load-{ref.component_id}")
         world.environment.install(agent, id=ref)
         load_agents.append((agent, monitor))
 

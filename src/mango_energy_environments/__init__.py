@@ -11,8 +11,11 @@ Two environments are provided:
     computation, scheduled failures, and per-agent observer/action wiring.
 
 **Scheduling** – :mod:`~mango_energy_environments.environments.scheduling`
-    Integrates a *pandapower* power network into mango.  Replays timeseries
-    data on the simulation clock and offers copper-plate economic dispatch.
+    Integrates a *pandapower* (:class:`PowerSystemsBehavior`) or *PyPSA*
+    (:class:`PyPSABehavior`) power network into mango.  Both share the same
+    :class:`ComponentRef`/taxonomy contract, replay timeseries data on the
+    simulation clock, and (pandapower only, for now) offer copper-plate
+    economic dispatch.
 
 Quick start::
 
@@ -42,10 +45,18 @@ from mango_energy_environments.environments.restoration import (
     topology_based_on_sector_grid,
 )
 from mango_energy_environments.environments.scheduling import (
+    DEFAULT_RENEWABLE_CARRIERS,
+    LOAD,
+    RENEWABLE,
+    STORAGE,
+    THERMAL,
     ComponentRef,
     PowerSystemsBehavior,
     PowerUpdateInfo,
+    PyPSABehavior,
+    SchedulingBehavior,
     calculate_initial_time,
+    extract_timeseries,
     get_components_by_type,
     get_possible_components,
 )
@@ -87,7 +98,15 @@ __all__ = [
     # Scheduling
     "PowerUpdateInfo",
     "ComponentRef",
+    "SchedulingBehavior",
+    "THERMAL",
+    "RENEWABLE",
+    "LOAD",
+    "STORAGE",
+    "DEFAULT_RENEWABLE_CARRIERS",
     "PowerSystemsBehavior",
+    "PyPSABehavior",
+    "extract_timeseries",
     "calculate_initial_time",
     "get_possible_components",
     "get_components_by_type",

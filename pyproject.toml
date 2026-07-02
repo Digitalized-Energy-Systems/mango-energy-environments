@@ -8,11 +8,12 @@ version = "0.1.0"
 description = "Energy system simulation environments for mango-agents"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-keywords = ["energy", "simulation", "multi-agent", "power-systems", "restoration"]
+keywords = ["energy", "simulation", "multi-agent", "power-systems", "restoration", "pypsa"]
 dependencies = [
     "mango-agents>=2.1",
     "monee>=1.0",
     "pandapower>=2.9.0",
+    "pypsa>=0.29",
     "networkx>=3.0",
     "pandas>=1.5.3",
     "numpy>=1.24",

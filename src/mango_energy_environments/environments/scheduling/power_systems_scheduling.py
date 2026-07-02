@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
@@ -17,57 +16,21 @@ import pandas as pd
 from mango.simulation.environment import Behavior, Environment
 from mango.util.clock import Clock
 
+from .base import LOAD, RENEWABLE, STORAGE, THERMAL, ComponentRef, PowerUpdateInfo
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "PowerUpdateInfo",
     "PowerSystemsBehavior",
-    "calculate_initial_time",
-    "get_possible_components",
-    "get_components_by_type",
 ]
 
-#: Synchronous / thermal generator.
-THERMAL = "gen"
-#: Static / renewable generator (wind, solar, run-of-river).
-RENEWABLE = "sgen"
-#: Demand / load.
-LOAD = "load"
-#: Energy storage / battery.
-STORAGE = "storage"
+#: Maps the shared taxonomy to pandapower's table attribute names.
+_TABLE_NAME = {THERMAL: "gen", RENEWABLE: "sgen", LOAD: "load", STORAGE: "storage"}
 
 _COL_P_MW = "p_mw"
 _COL_MAX_P_MW = "max_p_mw"
 _COL_MIN_P_MW = "min_p_mw"
 _COL_IN_SERVICE = "in_service"
-
-
-@dataclass(frozen=True)
-class PowerUpdateInfo:
-    """Emitted to an agent's event stream whenever its power value changes.
-
-    Carries no payload; the agent re-reads its observer to get the new value.
-    """
-
-
-@dataclass(frozen=True)
-class ComponentRef:
-    """Identifies a single component in a pandapower network.
-
-    Parameters
-    ----------
-    element_type:
-        One of ``"gen"``, ``"sgen"``, ``"load"``, ``"storage"``.
-    index:
-        The integer row index in the corresponding DataFrame.
-    """
-
-    element_type: str
-    index: int
-
-    def __iter__(self):
-        yield self.element_type
-        yield self.index
 
 
 class PowerSystemsBehavior(Behavior):
@@ -199,7 +162,7 @@ class PowerSystemsBehavior(Behavior):
         """Return :class:`ComponentRef` objects for all components of the given types."""
         refs: list[ComponentRef] = []
         for et in types:
-            df = getattr(self._net, et, None)
+            df = getattr(self._net, _TABLE_NAME[et], None)
             if df is None or df.empty:
                 continue
             for idx in df.index:
@@ -239,7 +202,7 @@ class PowerSystemsBehavior(Behavior):
         for et in (THERMAL, STORAGE):
             if et not in self._relevant_types:
                 continue
-            df = getattr(self._net, et, None)
+            df = getattr(self._net, _TABLE_NAME[et], None)
             if df is None or df.empty:
                 continue
             active = df[df.get(_COL_IN_SERVICE, pd.Series(True, index=df.index))]
@@ -253,7 +216,7 @@ class PowerSystemsBehavior(Behavior):
             logger.warning("solve_central: no controllable generators found")
             return {"success": False, "net": self._net, "objective": float("nan")}
 
-        sgen_df = getattr(self._net, RENEWABLE, None)
+        sgen_df = getattr(self._net, _TABLE_NAME[RENEWABLE], None)
         fixed_gen_mw = 0.0
         if sgen_df is not None and not sgen_df.empty and RENEWABLE in self._relevant_types:
             active_sgen = sgen_df[
@@ -261,7 +224,7 @@ class PowerSystemsBehavior(Behavior):
             ]
             fixed_gen_mw = float(active_sgen[_COL_P_MW].sum())
 
-        load_df = getattr(self._net, LOAD, None)
+        load_df = getattr(self._net, _TABLE_NAME[LOAD], None)
         total_demand_mw = 0.0
         if load_df is not None and not load_df.empty:
             active_load = load_df[
@@ -281,7 +244,7 @@ class PowerSystemsBehavior(Behavior):
 
         if result.success:
             for i, (et, idx) in enumerate(controllable):
-                getattr(self._net, et).at[idx, _COL_P_MW] = result.x[i]
+                getattr(self._net, _TABLE_NAME[et]).at[idx, _COL_P_MW] = result.x[i]
             logger.info(
                 "solve_central: dispatch successful, objective=%.4f MW·cost",
                 result.fun,
@@ -305,16 +268,17 @@ class PowerSystemsBehavior(Behavior):
 
     def _build_observers(self, ref: ComponentRef) -> dict[str, Callable[[], Any]]:
         et, idx = ref
+        table = _TABLE_NAME[et]
 
         def statics() -> dict:
-            return getattr(self._net, et).loc[idx].to_dict()
+            return getattr(self._net, table).loc[idx].to_dict()
 
         def max_active_power() -> float:
-            row = getattr(self._net, et).loc[idx]
+            row = getattr(self._net, table).loc[idx]
             return float(row.get(_COL_MAX_P_MW, row.get(_COL_P_MW, float("nan"))))
 
         def active_power() -> float:
-            return float(getattr(self._net, et).at[idx, _COL_P_MW])
+            return float(getattr(self._net, table).at[idx, _COL_P_MW])
 
         return {
             "statics": statics,
@@ -327,8 +291,10 @@ class PowerSystemsBehavior(Behavior):
         actions: dict[str, Callable] = {}
 
         if et in (THERMAL, RENEWABLE, STORAGE):
+            table = _TABLE_NAME[et]
+
             def regulate(active_power_mw: float) -> None:
-                getattr(self._net, et).at[idx, _COL_P_MW] = active_power_mw
+                getattr(self._net, table).at[idx, _COL_P_MW] = active_power_mw
 
             actions["regulate"] = regulate
 
@@ -338,11 +304,12 @@ class PowerSystemsBehavior(Behavior):
         self, ref: ComponentRef, value: float, environment: Environment
     ) -> None:
         et, idx = ref
+        table = _TABLE_NAME[et]
         if et == RENEWABLE:
-            nominal = getattr(self._net, et).at[idx, _COL_MAX_P_MW]
-            getattr(self._net, et).at[idx, _COL_MAX_P_MW] = value * nominal
+            nominal = getattr(self._net, table).at[idx, _COL_MAX_P_MW]
+            getattr(self._net, table).at[idx, _COL_MAX_P_MW] = value * nominal
         else:
-            getattr(self._net, et).at[idx, _COL_MAX_P_MW] = value
+            getattr(self._net, table).at[idx, _COL_MAX_P_MW] = value
 
         aid = self._ref_to_aid.get(ref)
         if aid is not None:
@@ -365,17 +332,3 @@ class PowerSystemsBehavior(Behavior):
             if earliest is None or dt < earliest:
                 earliest = dt
         return earliest or datetime.now(timezone.utc).replace(tzinfo=None)
-
-
-def calculate_initial_time(behavior: PowerSystemsBehavior) -> datetime:
-    return behavior.calculate_initial_time()
-
-
-def get_possible_components(behavior: PowerSystemsBehavior) -> list[ComponentRef]:
-    return behavior.get_possible_components()
-
-
-def get_components_by_type(
-    behavior: PowerSystemsBehavior, types: list[str]
-) -> list[ComponentRef]:
-    return behavior.get_components_by_type(types)
