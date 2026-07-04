@@ -33,7 +33,7 @@ def create_physics_stepper(
     monee_net,
     *,
     solve_time_limit_s: float | None = None,
-    max_history: int = 4,
+    max_history: int = 2,
 ):
     """Build the persistent :class:`monee.Stepper` that drives the environment's
     physics solves.

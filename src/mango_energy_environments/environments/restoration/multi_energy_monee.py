@@ -18,7 +18,6 @@ from monee.model.child import ExtHydrGrid
 from mango_energy_environments.base.monee import (
     connected_components,
     create_physics_stepper,
-    energyflow,
 )
 
 logger = logging.getLogger(__name__)
@@ -177,6 +176,8 @@ class RestorationEnvironmentBehavior(Behavior):
         self._physics_solve_time_limit_s = physics_solve_time_limit_s
         self._stepper = None
         self._last_seen_t: float = 0.0
+        self._physics_solves_ok: int = 0
+        self._physics_solves_failed: int = 0
 
         self._scheduled_failures: list[tuple[float, int, Failure]] = []
         self._failure_seq: int = 0
@@ -255,7 +256,9 @@ class RestorationEnvironmentBehavior(Behavior):
         if candidate is not None and not getattr(candidate, "failed", False):
             result = getattr(candidate, "result", candidate)
         if result is not None and getattr(result, "success", True):
+            self._physics_solves_ok += 1
             return result
+        self._physics_solves_failed += 1
         if prev is None:
             # No feasible state yet: expose the unsolved net so observers see
             # constructor-default values instead of crashing on None.
@@ -280,13 +283,9 @@ class RestorationEnvironmentBehavior(Behavior):
         elapsed since the last solve.
         """
         logger.debug("RestorationEnvironmentBehavior: forced energy-flow flush")
-        dt_h = (
-            max(self._last_seen_t - self._last_energy_flow_t, 0.0)
-            * self._physics_time_scale
-            / 3600.0
-        )
         self._net_results = self._accept_or_keep(
-            self._net_results, self._solve_physics(dt_h)
+            self._net_results,
+            self._solve_physics(self._dt_h_since_last(self._last_seen_t)),
         )
         self._last_energy_flow_t = max(self._last_seen_t, self._last_energy_flow_t)
         self._acts_since_solve = 0
@@ -310,6 +309,24 @@ class RestorationEnvironmentBehavior(Behavior):
         self._scheduled_failures = remaining
 
         if triggered:
+            # Temporal mode: integrate the interval that elapsed BEFORE the
+            # failure on the pre-failure topology first — otherwise the next
+            # solve charges up to a full physics interval of linepack/LTC
+            # dynamics to a net that had already lost the component. Inert
+            # quasi-statically (dt unused), so gated to keep solve counts
+            # identical for standard campaigns.
+            if (
+                self._physics_interval_s is not None
+                and self._stepper is not None
+                and clock.time > self._last_energy_flow_t
+            ):
+                self._net_results = self._accept_or_keep(
+                    self._net_results,
+                    self._solve_physics(self._dt_h_since_last(clock.time)),
+                )
+                self._last_energy_flow_t = clock.time
+                self._acts_since_solve = 0
+                self._dirty = False
             self._handle_failures(environment, triggered)
 
         self._last_seen_t = end_time

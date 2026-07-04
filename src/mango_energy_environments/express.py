@@ -72,6 +72,9 @@ def create_restoration_world(
     with_communication: bool = True,
     start_date: datetime = _DEFAULT_START_DATE,
     static_delay_s: float = _DEFAULT_STATIC_DELAY_S,
+    physics_time_scale: float | None = None,
+    physics_interval_s: float | None = None,
+    physics_solve_time_limit_s: float | None = None,
 ) -> SimulationWorld:
     """Create a fully configured :class:`~mango.simulation.world.SimulationWorld`
     for a multi-energy restoration scenario.
@@ -88,10 +91,18 @@ def create_restoration_world(
     static_delay_s:
         Default static message delay used before Poisson communication is
         enabled (or permanently when *with_communication* is ``False``).
+    physics_time_scale / physics_interval_s / physics_solve_time_limit_s:
+        Forwarded to :class:`RestorationEnvironmentBehavior` (``None`` keeps
+        the behavior's defaults); see its docstring for semantics.
     """
     from mango.simulation.communication import SimpleCommunicationSimulation
 
-    behavior = RestorationEnvironmentBehavior(monee_net)
+    behavior = RestorationEnvironmentBehavior(
+        monee_net,
+        physics_time_scale=1.0 if physics_time_scale is None else physics_time_scale,
+        physics_interval_s=physics_interval_s,
+        physics_solve_time_limit_s=physics_solve_time_limit_s,
+    )
     environment = DefaultEnvironment(behavior=behavior)
     com_sim = SimpleCommunicationSimulation(default_delay_s=static_delay_s)
     world = create_world(start_time=0.0, communication_sim=com_sim, environment=environment)
