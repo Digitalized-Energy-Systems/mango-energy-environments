@@ -15,9 +15,18 @@ from mango.util.clock import Clock
 
 from monee.model.child import ExtHydrGrid
 
-from mango_energy_environments.base.monee import connected_components, energyflow
+from mango_energy_environments.base.monee import (
+    connected_components,
+    create_physics_stepper,
+    energyflow,
+)
 
 logger = logging.getLogger(__name__)
+
+# Stepper.step requires dt_h > 0; quasi-static solves (agent-action re-solves
+# with no elapsed sim time) use this floor, which is far below any timescale
+# the temporal extensions integrate over.
+_MIN_DT_H = 1e-9
 
 __all__ = [
     "Failure",
@@ -91,11 +100,29 @@ class RestorationEnvironmentBehavior(Behavior):
     the behavior:
 
     1. Checks for scheduled failures that have become due and applies them.
-    2. Recomputes the energy flow (via monee) when the network state is dirty.
+    2. Advances the physics (via a persistent :class:`monee.Stepper`) when the
+       network state is dirty or the periodic physics interval has elapsed.
 
     Per-agent *observers* (read-only state queries) and *actions* (state
     mutations) are registered in :meth:`install` and exposed via :meth:`observe`
     and :meth:`act`.
+
+    Physics stepping
+    ----------------
+    Every solve is a ``stepper.step(dt_h)`` on the live net, so inter-step
+    state (gas linepack, lumped thermal capacitance, storage SoC) carries
+    between solves via monee's ``StepState``. Two knobs decouple the physical
+    timeline from the agent-communication clock (which stays in discrete-event
+    seconds dominated by ~20 ms message delays):
+
+    - ``physics_time_scale``: physical seconds per simulated second. The
+      integration interval of a solve is ``elapsed_sim_s * scale / 3600``
+      hours, so a 30 s agent run can span a multi-hour physical horizon.
+    - ``physics_interval_s``: periodic re-solve cadence in simulated seconds.
+      Without it physics only advances when an agent action or failure marks
+      the net dirty — fine quasi-statically, but temporal dynamics (linepack
+      depletion, thermal cooling) must keep integrating even while agents are
+      quiet.
 
     Parameters
     ----------
@@ -107,6 +134,15 @@ class RestorationEnvironmentBehavior(Behavior):
         Called with ``(node_id,)`` after each node failure.
     on_custom_failure:
         Called with ``(custom_id,)`` after each custom failure.
+    physics_time_scale:
+        Physical seconds represented by one simulated second (default 1.0).
+    physics_interval_s:
+        Re-solve the physics at least every this many simulated seconds,
+        dirty or not (default ``None`` = event-driven solves only).
+    physics_solve_time_limit_s:
+        Per-solve wall-clock cap forwarded to the stepper's solver backend
+        (currently applied on the gurobipy/islanding path; the Pyomo path is
+        capped globally by the host's solver guard).
     """
 
     def __init__(
@@ -117,6 +153,9 @@ class RestorationEnvironmentBehavior(Behavior):
         on_custom_failure: Callable[[Any], None] = lambda _: None,
         energy_flow_cooldown_s: float = 0.1,
         energy_flow_max_acts: int = 0,
+        physics_time_scale: float = 1.0,
+        physics_interval_s: float | None = None,
+        physics_solve_time_limit_s: float | None = None,
     ) -> None:
         self._net = net
         self._net_results = None
@@ -125,11 +164,19 @@ class RestorationEnvironmentBehavior(Behavior):
         self._on_node_failure = on_node_failure
         self._on_custom_failure = on_custom_failure
         self._dirty: bool = False
-        
+
         self._energy_flow_cooldown_s: float = float(energy_flow_cooldown_s)
         self._last_energy_flow_t: float = float("-inf")
         self._energy_flow_max_acts: int = int(energy_flow_max_acts)
         self._acts_since_solve: int = 0
+
+        self._physics_time_scale: float = float(physics_time_scale)
+        self._physics_interval_s: float | None = (
+            None if physics_interval_s is None else float(physics_interval_s)
+        )
+        self._physics_solve_time_limit_s = physics_solve_time_limit_s
+        self._stepper = None
+        self._last_seen_t: float = 0.0
 
         self._scheduled_failures: list[tuple[float, int, Failure]] = []
         self._failure_seq: int = 0
@@ -149,27 +196,76 @@ class RestorationEnvironmentBehavior(Behavior):
     def failures(self) -> list[Failure]:
         return self._failures
 
-    def initialize(self, environment: Environment, clock: Clock) -> None:
-        logger.debug("RestorationEnvironmentBehavior: running initial energy flow")
-        self._net_results = energyflow(self._net)
-        self._last_energy_flow_t = clock.time
+    @property
+    def stepper(self):
+        """The persistent monee Stepper (``None`` before :meth:`initialize`)."""
+        return self._stepper
 
-    @staticmethod
-    def _accept_or_keep(prev, candidate):
-        """Return *candidate* when the solve succeeded, otherwise keep
+    def network_changes_df(self):
+        """Recorded topology/islanding change events as a DataFrame, or
+        ``None`` before initialization."""
+        if self._stepper is None:
+            return None
+        return self._stepper.changes_df()
+
+    def initialize(self, environment: Environment, clock: Clock) -> None:
+        logger.debug(
+            "RestorationEnvironmentBehavior: building physics stepper "
+            "(time_scale=%.1f, interval_s=%s) and running initial solve",
+            self._physics_time_scale,
+            self._physics_interval_s,
+        )
+        self._stepper = create_physics_stepper(
+            self._net,
+            solve_time_limit_s=self._physics_solve_time_limit_s,
+        )
+        self._net_results = self._accept_or_keep(
+            None, self._solve_physics(_MIN_DT_H)
+        )
+        self._last_energy_flow_t = clock.time
+        self._last_seen_t = clock.time
+
+    def _solve_physics(self, dt_h: float):
+        """Advance the persistent stepper by *dt_h* hours (floored to
+        ``_MIN_DT_H``) and return the monee ``StepResult``. A failed step
+        carries its interval into the next successful solve
+        (``on_step_error="skip"``), keeping temporal integration
+        conservative."""
+        return self._stepper.step(max(float(dt_h), _MIN_DT_H))
+
+    def _dt_h_since_last(self, now: float) -> float:
+        return (
+            max(now - self._last_energy_flow_t, 0.0)
+            * self._physics_time_scale
+            / 3600.0
+        )
+
+    def _accept_or_keep(self, prev, candidate):
+        """Return the step's solve result when it succeeded, otherwise keep
         *prev*.  monee's ``SolverResult`` exposes ``success`` (False on
-        infeasible / non-OK termination); pyomo's ``load_solutions=True``
-        has already pushed a witness / partial solution onto every Var
-        by then, so accepting that result would feed garbage to the
+        infeasible / non-OK termination); a solver's ``load_solutions``
+        may have pushed a witness / partial solution onto every Var by
+        then, so accepting that result would feed garbage to the
         ``observe()`` calls until the next successful solve.  Falling
         back to the last feasible result is the conservative choice
         and matches the energy_flow_cooldown contract (observers may
         see a slightly stale state, never an inconsistent one).
         """
+        result = None
+        if candidate is not None and not getattr(candidate, "failed", False):
+            result = getattr(candidate, "result", candidate)
+        if result is not None and getattr(result, "success", True):
+            return result
         if prev is None:
-            return candidate
-        if getattr(candidate, "success", True):
-            return candidate
+            # No feasible state yet: expose the unsolved net so observers see
+            # constructor-default values instead of crashing on None.
+            logger.error(
+                "initial physics solve failed — observers read the unsolved "
+                "net state until a solve succeeds."
+            )
+            from types import SimpleNamespace
+
+            return SimpleNamespace(network=self._net, success=False)
         logger.warning(
             "energyflow infeasible — keeping previous net_results to avoid "
             "propagating an inadmissible witness solution to observers."
@@ -177,15 +273,22 @@ class RestorationEnvironmentBehavior(Behavior):
         return prev
 
     def flush_energy_flow(self) -> None:
-        """Force an immediate energy-flow recompute, bypassing the
-        cooldown.  Use at end-of-simulation (or any other measurement
-        boundary) so observers read post-agent-action state rather than
-        a stale ``_net_results`` cached from a pre-cooldown solve.
+        """Force an immediate physics solve, bypassing the cooldown.  Use at
+        end-of-simulation (or any other measurement boundary) so observers
+        read post-agent-action state rather than a stale ``_net_results``
+        cached from a pre-cooldown solve.  The step integrates the sim time
+        elapsed since the last solve.
         """
         logger.debug("RestorationEnvironmentBehavior: forced energy-flow flush")
-        self._net_results = self._accept_or_keep(
-            self._net_results, energyflow(self._net)
+        dt_h = (
+            max(self._last_seen_t - self._last_energy_flow_t, 0.0)
+            * self._physics_time_scale
+            / 3600.0
         )
+        self._net_results = self._accept_or_keep(
+            self._net_results, self._solve_physics(dt_h)
+        )
+        self._last_energy_flow_t = max(self._last_seen_t, self._last_energy_flow_t)
         self._acts_since_solve = 0
         self._dirty = False
 
@@ -209,24 +312,35 @@ class RestorationEnvironmentBehavior(Behavior):
         if triggered:
             self._handle_failures(environment, triggered)
 
-        if self._dirty:
-            since_last = clock.time - self._last_energy_flow_t
+        self._last_seen_t = end_time
+
+        since_last = clock.time - self._last_energy_flow_t
+        periodic_due = (
+            self._physics_interval_s is not None
+            and since_last >= self._physics_interval_s
+        )
+        if self._dirty or periodic_due:
             acts_over = (
                 self._energy_flow_max_acts > 0
                 and self._acts_since_solve >= self._energy_flow_max_acts
             )
-            if since_last < self._energy_flow_cooldown_s and not acts_over:
+            if (
+                not periodic_due
+                and since_last < self._energy_flow_cooldown_s
+                and not acts_over
+            ):
                 return
-            
+
             logger.debug(
-                "RestorationEnvironmentBehavior: recomputing energy flow "
-                "(t=%.3f, dt=%.3f, since_last=%.3f)",
+                "RestorationEnvironmentBehavior: physics step "
+                "(t=%.3f, dt=%.3f, since_last=%.3f, periodic=%s)",
                 clock.time,
                 step_size_s,
                 since_last,
+                periodic_due,
             )
             self._net_results = self._accept_or_keep(
-                self._net_results, energyflow(self._net)
+                self._net_results, self._solve_physics(self._dt_h_since_last(clock.time))
             )
             self._last_energy_flow_t = clock.time
             self._acts_since_solve = 0

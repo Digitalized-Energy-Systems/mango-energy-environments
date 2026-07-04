@@ -29,6 +29,51 @@ def energyflow(monee_net):
     )
 
 
+def create_physics_stepper(
+    monee_net,
+    *,
+    solve_time_limit_s: float | None = None,
+    max_history: int = 4,
+):
+    """Build the persistent :class:`monee.Stepper` that drives the environment's
+    physics solves.
+
+    The stepper works directly on *monee_net* (``copy_base=False``) so agent
+    setpoint writes and failure deactivations on the live net are picked up by
+    the next step without an override channel; each step still solves on a
+    per-step network copy and pushes the solved state into the shared
+    ``StepState``, which is what activates monee's inter-step dynamics
+    (gas linepack, lumped thermal capacitance, storage SoC).
+
+    Backend selection: a net carrying an ``islanding_config`` solves on
+    monee's native gurobipy backend — the islanding extension's indicator
+    constraints are bilinear (binary x continuous) and cannot pass Pyomo's LP
+    writer, which is exactly the failure mode the single-shot ``energyflow``
+    path hits. Plain nets keep the Pyomo+Gurobi path ``energyflow`` uses, so
+    campaigns without extensions solve on the identical solver stack as
+    before.
+
+    ``on_step_error="skip"`` keeps temporal integration conservative: a failed
+    step's interval is carried into the next successful solve instead of being
+    silently dropped.
+    """
+    common: dict = {
+        "copy_base": False,
+        "on_step_error": "skip",
+        "max_history": max_history,
+        "simulation": True,
+        "exclude_unconnected_nodes": True,
+    }
+    if getattr(monee_net, "islanding_config", None) is not None:
+        from monee.solver.gurobipy import GurobipySolver
+
+        params: dict = {}
+        if solve_time_limit_s is not None:
+            params["TimeLimit"] = float(solve_time_limit_s)
+        return monee.Stepper(monee_net, solver=GurobipySolver(params=params), **common)
+    return monee.Stepper(monee_net, solver="gurobi", **common)
+
+
 def upper(var_or_const):
     """Return the upper bound of a monee ``Var``, or the value itself for constants."""
 
