@@ -98,6 +98,8 @@ class SchedulingBehavior(Protocol):
 
     def get_components_by_type(self, types: list[str]) -> list[ComponentRef]: ...
 
+    def get_statics(self, ref: ComponentRef) -> dict: ...
+
 
 def calculate_initial_time(behavior: SchedulingBehavior) -> datetime:
     return behavior.calculate_initial_time()

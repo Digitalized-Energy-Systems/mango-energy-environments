@@ -245,9 +245,7 @@ class RestorationEnvironmentBehavior(Behavior):
         if fn is not None:
             fn(*args, **kwargs)
         else:
-            logger.warning(
-                "No action %r registered for agent %r", action, agent_id
-            )
+            logger.warning("No action %r registered for agent %r", action, agent_id)
 
     def has_action(self, agent_id: str, action: str) -> bool:
         """Return ``True`` if *agent_id* has the named *action* registered."""
@@ -344,7 +342,9 @@ class RestorationEnvironmentBehavior(Behavior):
                 # ``q_mvar`` may be a Var (ExtPowerGrid) or a plain
                 # scalar (PowerGenerator).  Setting ``.value`` works for
                 # the former; direct attribute assignment for the latter.
-                if hasattr(model.q_mvar, "value") and not isinstance(model.q_mvar, (int, float)):
+                if hasattr(model.q_mvar, "value") and not isinstance(
+                    model.q_mvar, (int, float)
+                ):
                     model.q_mvar.value = float(q_mvar_value)
                 else:
                     model.q_mvar = float(q_mvar_value)
@@ -397,7 +397,9 @@ class RestorationEnvironmentBehavior(Behavior):
         self._actions[aid] = actions
 
 
-def schedule_failure(behavior: RestorationEnvironmentBehavior, world, failure: Failure) -> None:
+def schedule_failure(
+    behavior: RestorationEnvironmentBehavior, world, failure: Failure
+) -> None:
     """Schedule *failure* on *behavior*."""
     behavior.schedule_failure(world, failure)
 
@@ -617,7 +619,10 @@ def _topology_grid_groups_by_sector(
             for branch_type_substr in include_branches:
                 for branch in monee_net.branches_connected_to(node.id):
                     model_type_name = type(branch.model).__name__
-                    if branch_type_substr in model_type_name and branch.tid not in added:
+                    if (
+                        branch_type_substr in model_type_name
+                        and branch.tid not in added
+                    ):
                         agent_ids.append(branch.tid)
 
             id_list.append((node.id, agent_ids))

@@ -7,16 +7,13 @@ monee environment), so these tests establish the canonical Python baseline.
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
-
 from mango.agent.role import Role, RoleAgent
-from mango.express.topology import create_topology
 from mango.simulation.communication import SimpleCommunicationSimulation
 from mango.simulation.environment import DefaultEnvironment
 from mango.simulation.world import create_world, discrete_step_until
 
+import mango_energy_environments.environments.restoration.multi_energy_monee as _restoration_mod
 from mango_energy_environments import (
     BranchFailureEvent,
     Failure,
@@ -25,9 +22,6 @@ from mango_energy_environments import (
     schedule_failure,
     topology_based_on_grid,
 )
-from mango_energy_environments.base.monee import energyflow
-import mango_energy_environments.environments.restoration.multi_energy_monee as _restoration_mod
-
 
 # ---------------------------------------------------------------------------
 # Autouse fixture: stub out the GEKKO-backed energyflow for all tests
@@ -92,8 +86,8 @@ class TestRestorationBehaviorUnit:
         assert not behavior._dirty
 
     def test_initialize_runs_energy_flow(self, example_net):
-        from mango.util.clock import ExternalClock
         from mango.simulation.environment import DefaultEnvironment
+        from mango.util.clock import ExternalClock
 
         behavior = RestorationEnvironmentBehavior(example_net)
         env = DefaultEnvironment(behavior=behavior)
@@ -170,8 +164,12 @@ class TestFailure:
         assert f.custom_id is None
 
     def test_full(self):
-        fn = lambda net: None
-        f = Failure(delay_s=2.0, branch_ids=[(0, 1, 0)], node_ids=[3], custom=fn, custom_id=99)
+        def fn(net) -> None:
+            return None
+
+        f = Failure(
+            delay_s=2.0, branch_ids=[(0, 1, 0)], node_ids=[3], custom=fn, custom_id=99
+        )
         assert f.branch_ids == [(0, 1, 0)]
         assert f.node_ids == [3]
         assert f.custom is fn
@@ -185,8 +183,8 @@ class TestFailure:
 
 class TestTopologyBasedOnGrid:
     def test_adds_nodes_for_each_monee_node(self, example_net):
-        from mango.express.topology import Topology
         import networkx as nx
+        from mango.express.topology import Topology
 
         world = create_world(start_time=0.0)
         topology = Topology(nx.Graph())
@@ -195,8 +193,8 @@ class TestTopologyBasedOnGrid:
         assert topology.graph.number_of_nodes() == len(example_net.nodes)
 
     def test_adds_edges_for_active_branches(self, example_net):
-        from mango.express.topology import Topology
         import networkx as nx
+        from mango.express.topology import Topology
 
         world = create_world(start_time=0.0)
         topology = Topology(nx.Graph())
@@ -226,7 +224,9 @@ async def test_mes_environment_shallow():
     behavior = RestorationEnvironmentBehavior(monee_net)
     environment = DefaultEnvironment(behavior=behavior)
     com_sim = SimpleCommunicationSimulation(default_delay_s=0.02)
-    world = create_world(start_time=0.0, communication_sim=com_sim, environment=environment)
+    world = create_world(
+        start_time=0.0, communication_sim=com_sim, environment=environment
+    )
 
     agents: list[RoleAgent] = []
     for node in monee_net.nodes:

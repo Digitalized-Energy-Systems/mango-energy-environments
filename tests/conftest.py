@@ -4,18 +4,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import pandas as pd
 import pandapower as pp
+import pandas as pd
 import pytest
 
 from mango_energy_environments.environments.scheduling import (
-    LOAD,
     RENEWABLE,
-    STORAGE,
     THERMAL,
     ComponentRef,
 )
-
 
 # ---------------------------------------------------------------------------
 # monee fixtures
@@ -73,14 +70,17 @@ def five_bus_net():
     g1 = pp.create_gen(
         net, bus=buses[1], p_mw=30.0, min_p_mw=5.0, max_p_mw=60.0, name="Thermal1"
     )
-    sg0 = pp.create_sgen(
-        net, bus=buses[2], p_mw=20.0, max_p_mw=40.0, name="Wind0"
-    )
+    sg0 = pp.create_sgen(net, bus=buses[2], p_mw=20.0, max_p_mw=40.0, name="Wind0")
     l0 = pp.create_load(net, bus=buses[3], p_mw=45.0, name="Load0")
     l1 = pp.create_load(net, bus=buses[4], p_mw=30.0, name="Load1")
     st0 = pp.create_storage(
-        net, bus=buses[0], p_mw=0.0, min_p_mw=-20.0, max_p_mw=20.0,
-        max_e_mwh=80.0, name="Batt0"
+        net,
+        bus=buses[0],
+        p_mw=0.0,
+        min_p_mw=-20.0,
+        max_p_mw=20.0,
+        max_e_mwh=80.0,
+        name="Batt0",
     )
 
     # Hourly timeseries for renewable (per-unit availability × max_p_mw)
@@ -197,6 +197,8 @@ def five_bus_pypsa_net():
     )
 
     wind_values = [0.3 + 0.4 * abs((i % 24 - 12) / 12) for i in range(periods)]
-    timeseries = {ComponentRef(RENEWABLE, "wind0"): pd.Series(wind_values, index=snapshots)}
+    timeseries = {
+        ComponentRef(RENEWABLE, "wind0"): pd.Series(wind_values, index=snapshots)
+    }
 
     return net, timeseries, start

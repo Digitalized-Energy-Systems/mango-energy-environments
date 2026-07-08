@@ -13,14 +13,11 @@ Example::
 
 from __future__ import annotations
 
-import math
 import random
 from collections.abc import Callable
 from datetime import datetime
 
 import networkx as nx
-
-from mango.express.topology import Topology, create_topology
 from mango.simulation.communication import DelayProviderCommunicationSimulation
 from mango.simulation.environment import DefaultEnvironment
 from mango.simulation.world import SimulationWorld, create_world
@@ -39,7 +36,6 @@ from mango_energy_environments.base.monee import (
 )
 from mango_energy_environments.environments.restoration.multi_energy_monee import (
     RestorationEnvironmentBehavior,
-    topology_based_on_grid,
 )
 
 __all__ = [
@@ -94,7 +90,9 @@ def create_restoration_world(
     behavior = RestorationEnvironmentBehavior(monee_net)
     environment = DefaultEnvironment(behavior=behavior)
     com_sim = SimpleCommunicationSimulation(default_delay_s=static_delay_s)
-    world = create_world(start_time=0.0, communication_sim=com_sim, environment=environment)
+    world = create_world(
+        start_time=0.0, communication_sim=com_sim, environment=environment
+    )
 
     if with_communication:
         enable_poisson_com_for_monee(world, monee_net)

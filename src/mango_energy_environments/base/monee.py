@@ -1,11 +1,11 @@
 """Monee integration utilities."""
+
 from __future__ import annotations
 
-import networkx as nx
-
 import monee
-from monee.model.core import upper as _upper
+import networkx as nx
 from monee.model.core import lower as _lower
+from monee.model.core import upper as _upper
 from monee.network import mes
 
 
@@ -17,7 +17,9 @@ def energyflow(monee_net):
     """
 
     return monee.run_energy_flow(
-        monee_net, solver="gurobi", exclude_unconnected_nodes=True,
+        monee_net,
+        solver="gurobi",
+        exclude_unconnected_nodes=True,
     )
 
 

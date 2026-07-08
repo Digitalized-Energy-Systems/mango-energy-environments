@@ -14,13 +14,11 @@ replicates the spirit: 2 thermal generators, 1 renewable, 2 loads, 1 storage.
 
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 
-import pandas as pd
 import pandapower as pp
+import pandas as pd
 import pytest
-
 from mango.agent.role import Role, RoleAgent
 from mango.simulation.communication import SimpleCommunicationSimulation
 from mango.simulation.environment import DefaultEnvironment
@@ -40,7 +38,6 @@ from mango_energy_environments.environments.scheduling import (
     STORAGE,
     THERMAL,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helper role (mirrors Julia's @role struct PowerLoadMonitoring)
@@ -102,9 +99,7 @@ class TestPowerSystemsBehaviorUnit:
 
     def test_calculate_initial_time(self, power_net_with_timeseries):
         net, g0, l0, ts, start = power_net_with_timeseries
-        behavior = PowerSystemsBehavior(
-            net=net, timeseries=ts, start_datetime=start
-        )
+        behavior = PowerSystemsBehavior(net=net, timeseries=ts, start_datetime=start)
         assert calculate_initial_time(behavior) == start
 
     def test_get_components_by_type_wrapper(self, simple_power_net):
@@ -134,10 +129,22 @@ class TestPowerSystemsBehaviorUnit:
     def test_timeseries_key_normalisation(self, simple_power_net):
         """Both ComponentRef and tuple keys are accepted."""
         net, g0, l0 = simple_power_net
-        ts_ref = {ComponentRef(THERMAL, g0): pd.Series([1.0], index=pd.date_range("2024-01-01", periods=1, freq="h"))}
-        ts_tup = {(THERMAL, g0): pd.Series([1.0], index=pd.date_range("2024-01-01", periods=1, freq="h"))}
-        b_ref = PowerSystemsBehavior(net=net, timeseries=ts_ref, start_datetime=datetime(2024, 1, 1))
-        b_tup = PowerSystemsBehavior(net=net, timeseries=ts_tup, start_datetime=datetime(2024, 1, 1))
+        ts_ref = {
+            ComponentRef(THERMAL, g0): pd.Series(
+                [1.0], index=pd.date_range("2024-01-01", periods=1, freq="h")
+            )
+        }
+        ts_tup = {
+            (THERMAL, g0): pd.Series(
+                [1.0], index=pd.date_range("2024-01-01", periods=1, freq="h")
+            )
+        }
+        b_ref = PowerSystemsBehavior(
+            net=net, timeseries=ts_ref, start_datetime=datetime(2024, 1, 1)
+        )
+        b_tup = PowerSystemsBehavior(
+            net=net, timeseries=ts_tup, start_datetime=datetime(2024, 1, 1)
+        )
         assert b_ref._timeseries.keys() == b_tup._timeseries.keys()
 
 
@@ -269,8 +276,8 @@ class TestSolveCentral:
         net = pp.create_empty_network()
         b0 = pp.create_bus(net, vn_kv=20)
         b1 = pp.create_bus(net, vn_kv=20)
-        g0 = pp.create_gen(net, bus=b0, p_mw=5.0, min_p_mw=3.0, max_p_mw=10.0)
-        l0 = pp.create_load(net, bus=b1, p_mw=1.0)  # demand < min_p
+        pp.create_gen(net, bus=b0, p_mw=5.0, min_p_mw=3.0, max_p_mw=10.0)
+        pp.create_load(net, bus=b1, p_mw=1.0)  # demand < min_p
 
         behavior = PowerSystemsBehavior(net=net, relevant_types=[THERMAL, LOAD])
         result = behavior.solve_central()
@@ -281,8 +288,8 @@ class TestSolveCentral:
         net = pp.create_empty_network()
         b0 = pp.create_bus(net, vn_kv=20)
         b1 = pp.create_bus(net, vn_kv=20)
-        g0 = pp.create_gen(net, bus=b0, p_mw=5.0, min_p_mw=0.0, max_p_mw=3.0)
-        l0 = pp.create_load(net, bus=b1, p_mw=10.0)  # demand > max
+        pp.create_gen(net, bus=b0, p_mw=5.0, min_p_mw=0.0, max_p_mw=3.0)
+        pp.create_load(net, bus=b1, p_mw=10.0)  # demand > max
 
         behavior = PowerSystemsBehavior(net=net, relevant_types=[THERMAL, LOAD])
         result = behavior.solve_central()
@@ -296,7 +303,7 @@ class TestSolveCentral:
         # gen0: cheap (cost=1), gen1: expensive (cost=10), equal capacity
         g0 = pp.create_gen(net, bus=b0, p_mw=0.0, min_p_mw=0.0, max_p_mw=5.0)
         g1 = pp.create_gen(net, bus=b0, p_mw=0.0, min_p_mw=0.0, max_p_mw=5.0)
-        l0 = pp.create_load(net, bus=b1, p_mw=3.0)
+        pp.create_load(net, bus=b1, p_mw=3.0)
 
         net.gen.at[g0, "cost_per_mw"] = 1.0
         net.gen.at[g1, "cost_per_mw"] = 10.0
@@ -312,13 +319,15 @@ class TestSolveCentral:
     def test_dispatch_with_fixed_renewables(self, five_bus_net):
         """Renewables are subtracted from demand before dispatching thermals."""
         net, (g0, g1, sg0, l0, l1, st0), ts, start = five_bus_net
-        behavior = PowerSystemsBehavior(net=net, relevant_types=[THERMAL, RENEWABLE, LOAD])
+        behavior = PowerSystemsBehavior(
+            net=net, relevant_types=[THERMAL, RENEWABLE, LOAD]
+        )
         result = behavior.solve_central()
 
         assert result["success"]
-        total_demand = net.load["p_mw"].sum()         # 75 MW
-        renewable_gen = net.sgen["p_mw"].sum()         # 20 MW
-        net_demand = total_demand - renewable_gen       # 55 MW
+        total_demand = net.load["p_mw"].sum()  # 75 MW
+        renewable_gen = net.sgen["p_mw"].sum()  # 20 MW
+        net_demand = total_demand - renewable_gen  # 55 MW
         dispatched = net.gen["p_mw"].sum()
         assert dispatched == pytest.approx(net_demand, abs=1e-4)
 
@@ -362,7 +371,9 @@ async def test_power_systems_shallow(five_bus_net):
     )
     environment = DefaultEnvironment(behavior=behavior)
     com_sim = SimpleCommunicationSimulation(default_delay_s=0.1, loss_percent=0.0)
-    world = create_world(start_time=0.0, communication_sim=com_sim, environment=environment)
+    world = create_world(
+        start_time=0.0, communication_sim=com_sim, environment=environment
+    )
 
     # Register load agents with monitoring role (mirrors Julia test)
     load_refs = behavior.get_components_by_type([LOAD])

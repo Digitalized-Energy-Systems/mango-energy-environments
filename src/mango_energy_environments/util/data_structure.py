@@ -21,9 +21,7 @@ class DotDict(dict):
         try:
             return self[key]
         except KeyError:
-            raise AttributeError(
-                f"'DotDict' object has no attribute '{key}'"
-            ) from None
+            raise AttributeError(f"'DotDict' object has no attribute '{key}'") from None
 
     def __setattr__(self, key: str, value: Any) -> None:
         self[key] = value
@@ -32,9 +30,7 @@ class DotDict(dict):
         try:
             del self[key]
         except KeyError:
-            raise AttributeError(
-                f"'DotDict' object has no attribute '{key}'"
-            ) from None
+            raise AttributeError(f"'DotDict' object has no attribute '{key}'") from None
 
     def __repr__(self) -> str:
         return f"DotDict({dict.__repr__(self)})"
