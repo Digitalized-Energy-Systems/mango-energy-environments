@@ -373,6 +373,14 @@ class RestorationEnvironmentBehavior(Behavior):
         type:
             ``"child"``, ``"node"``, or ``"branch"``.
         """
+        # mango's world.register auto-invokes the environment install hook with
+        # only ``agent_id`` (no component id/type). Ignore that call — the
+        # restoration builder binds each agent explicitly via
+        # ``install(agent, id=..., type=...)`` right after registering it.
+        # A call carrying only one of the two is a malformed explicit bind
+        # and still raises below.
+        if "id" not in kwargs and "type" not in kwargs:
+            return
         component_id = kwargs["id"]
         component_type = kwargs["type"]
 
@@ -649,12 +657,12 @@ def topology_based_on_grid(
 
     for node in monee_net.nodes:
         agents = []
-        if node.tid in world._agents:
-            agents.append(world._agents[node.tid])
+        if node.tid in world.agents:
+            agents.append(world.agents[node.tid])
         if include_childs:
             for child in monee_net.childs_by_ids(node.child_ids):
-                if child.tid in world._agents:
-                    agents.append(world._agents[child.tid])
+                if child.tid in world.agents:
+                    agents.append(world.agents[child.tid])
         topo_id = topology.add_node(*agents)
         monee_to_topo[node.id] = topo_id
 
@@ -768,12 +776,12 @@ def _topology_grid_groups_by_sector(
 
             agent_ids: list[str] = []
 
-            if include_nodes and node.tid in world._agents:
+            if include_nodes and node.tid in world.agents:
                 agent_ids.append(node.tid)
 
             if include_childs:
                 for child in monee_net.childs_by_ids(node.child_ids):
-                    if child.tid in world._agents and child.tid not in added:
+                    if child.tid in world.agents and child.tid not in added:
                         agent_ids.append(child.tid)
 
             if include_cps:
@@ -798,7 +806,7 @@ def _topology_grid_groups_by_sector(
         for node_id, agent_ids in id_list:
             if not agent_ids:
                 continue
-            agents = [world._agents[aid] for aid in agent_ids if aid in world._agents]
+            agents = [world.agents[aid] for aid in agent_ids if aid in world.agents]
             if not agents:
                 continue
 
@@ -889,19 +897,19 @@ def topology_based_on_sector_grid(
             continue
 
         agents = []
-        if include_nodes and node.tid in world._agents:
-            agents.append(world._agents[node.tid])
+        if include_nodes and node.tid in world.agents:
+            agents.append(world.agents[node.tid])
         if include_childs:
             for child in monee_net.childs_by_ids(node.child_ids):
-                if child.tid in world._agents:
-                    agents.append(world._agents[child.tid])
+                if child.tid in world.agents:
+                    agents.append(world.agents[child.tid])
         for branch in monee_net.branches_connected_to(node.id):
             if not _is_point_device(branch):
                 continue
             if branch.tid in added_branch_tids:
                 continue
-            if branch.tid in world._agents:
-                agents.append(world._agents[branch.tid])
+            if branch.tid in world.agents:
+                agents.append(world.agents[branch.tid])
                 added_branch_tids.add(branch.tid)
 
         # Always add the node — even agentless transit nodes are needed
