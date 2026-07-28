@@ -749,6 +749,22 @@ def topology_based_on_grid_groups(
             )
 
 
+def _component_aid(comp) -> str:
+    """Agent id for a monee component, as registered in ``world.agents``.
+
+    A branch's ``tid`` is NOT its agent id: monee embeds the MultiGraph key
+    (``branch-{hi}-{lo}-{key}``, ``monee.model.core:582``) so parallel branches
+    stay distinct, while branch agents are registered under
+    :func:`create_branch_aid` (``branch-{hi}-{lo}``). Looking a branch up by
+    ``tid`` therefore always misses, and callers that filter on
+    ``aid in world.agents`` drop it silently — which left the ``cps`` topology
+    with zero agents and every holon leader with an empty connector list.
+    """
+    if hasattr(comp, "from_node_id") and hasattr(comp, "to_node_id"):
+        return create_branch_aid(comp.id)
+    return comp.tid
+
+
 def _topology_grid_groups_by_sector(
     components: list[set],
     monee_net,
@@ -786,16 +802,21 @@ def _topology_grid_groups_by_sector(
 
             if include_cps:
                 for comp in monee_net.components_connected_to(node.id):
-                    if comp.model.is_cp() and comp.tid not in added:
-                        agent_ids.append(comp.tid)
+                    comp_aid = _component_aid(comp)
+                    if comp.model.is_cp() and comp_aid not in added:
+                        agent_ids.append(comp_aid)
                 if node.model.is_cp() and node.tid not in added:
                     agent_ids.append(node.tid)
 
             for branch_type_substr in include_branches:
                 for branch in monee_net.branches_connected_to(node.id):
                     model_type_name = type(branch.model).__name__
-                    if branch_type_substr in model_type_name and branch.tid not in added:
-                        agent_ids.append(branch.tid)
+                    branch_agent_aid = _component_aid(branch)
+                    if (
+                        branch_type_substr in model_type_name
+                        and branch_agent_aid not in added
+                    ):
+                        agent_ids.append(branch_agent_aid)
 
             id_list.append((node.id, agent_ids))
             added.extend(agent_ids)
