@@ -401,3 +401,56 @@ async def test_branch_switch_action(example_net):
     behavior.act(agent.aid, "switch")
     assert branch.model.on_off != original_state
     assert behavior._dirty
+
+
+# ---------------------------------------------------------------------------
+# Branch agent-id vs monee component tid (see _component_aid)
+# ---------------------------------------------------------------------------
+
+
+def test_component_aid_uses_branch_agent_convention_not_monee_tid():
+    """A branch's monee ``tid`` is not its agent id.
+
+    monee embeds the MultiGraph key in ``Branch.tid`` (``branch-{hi}-{lo}-{key}``)
+    so parallel branches stay distinct, while branch agents are registered under
+    ``create_branch_aid`` (``branch-{hi}-{lo}``). Looking a branch up by ``tid``
+    silently misses every time — that mismatch built the ``cps`` topology with
+    zero agents and left every holon leader with an empty connector list.
+    """
+    from mango_energy_environments.environments.restoration.multi_energy_monee import (
+        _component_aid,
+        create_branch_aid,
+    )
+
+    class _Branch:
+        id = (2, 260, 0)
+        from_node_id = 2
+        to_node_id = 260
+        tid = "branch-260-2-0"
+
+    class _Child:
+        id = 7
+        tid = "child-7"
+
+    assert _component_aid(_Branch()) == "branch-260-2"
+    assert _component_aid(_Branch()) == create_branch_aid(_Branch.id)
+    assert _component_aid(_Branch()) != _Branch.tid, "must not use the monee tid"
+    # non-branch components are unaffected
+    assert _component_aid(_Child()) == "child-7"
+
+
+def test_real_monee_branch_tid_still_differs_from_agent_aid():
+    """Pins the upstream drift: if monee ever reverts, this test says so."""
+    from monee.model.core import Branch
+    from mango_energy_environments.environments.restoration.multi_energy_monee import (
+        _component_aid,
+        create_branch_aid,
+    )
+
+    br = Branch.__new__(Branch)
+    br.id = (2, 260, 0)
+    br.from_node_id = 2
+    br.to_node_id = 260
+    assert br.tid == "branch-260-2-0", f"monee tid format changed: {br.tid}"
+    assert create_branch_aid(br.id) == "branch-260-2"
+    assert _component_aid(br) == create_branch_aid(br.id)

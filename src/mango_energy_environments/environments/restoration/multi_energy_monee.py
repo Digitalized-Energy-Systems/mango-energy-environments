@@ -900,7 +900,7 @@ def topology_based_on_sector_grid(
         include_branches = []
 
     monee_to_topo: dict[Any, int] = {}
-    added_branch_tids: set = set()
+    added_branch_aids: set = set()
 
     def _matches(node) -> bool:
         grid = node.grid
@@ -927,11 +927,12 @@ def topology_based_on_sector_grid(
         for branch in monee_net.branches_connected_to(node.id):
             if not _is_point_device(branch):
                 continue
-            if branch.tid in added_branch_tids:
+            branch_agent_aid = _component_aid(branch)
+            if branch_agent_aid in added_branch_aids:
                 continue
-            if branch.tid in world.agents:
-                agents.append(world.agents[branch.tid])
-                added_branch_tids.add(branch.tid)
+            if branch_agent_aid in world.agents:
+                agents.append(world.agents[branch_agent_aid])
+                added_branch_aids.add(branch_agent_aid)
 
         # Always add the node — even agentless transit nodes are needed
         # to keep the physical graph connected for downstream community
