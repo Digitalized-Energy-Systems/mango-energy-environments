@@ -58,6 +58,7 @@ class BranchFailureHandler(Role):
     """Counts received global failure events and forwarded string messages."""
 
     def __init__(self):
+        super().__init__()
         self.counter = 0
         self.msg_counter = 0
 

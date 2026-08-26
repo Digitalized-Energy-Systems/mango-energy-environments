@@ -48,6 +48,7 @@ class PowerLoadMonitoring(Role):
     """Counts PowerUpdateInfo events received by the agent."""
 
     def __init__(self):
+        super().__init__()
         self.counter = 0
 
     def on_agent_event(self, event):
