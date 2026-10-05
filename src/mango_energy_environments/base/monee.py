@@ -9,16 +9,21 @@ from monee.model.core import upper as _upper
 from monee.network import mes
 
 
-def energyflow(monee_net):
+def energyflow(monee_net, solver=None):
     """Run steady-state energy flow on *monee_net* and return the result object.
 
     The returned result object exposes ``.network`` to access the post-flow
     network state.
+
+    *solver* must be a monee solver instance (e.g. ``monee.solver.GEKKOSolver()``
+    or ``monee.solver.PyomoSolver()``); monee >= 1.1 no longer accepts a solver
+    name string. ``None`` uses monee's default, a local GEKKO solver that needs
+    no external solver installation or licence.
     """
 
     return monee.run_energy_flow(
         monee_net,
-        solver="gurobi",
+        solver=solver,
         exclude_unconnected_nodes=True,
     )
 
