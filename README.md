@@ -69,6 +69,7 @@ from mango_energy_environments import (
 
 class BranchFailureHandler(Role):
     def __init__(self):
+        super().__init__()
         self.counter = 0
         self.msg_counter = 0
 
@@ -111,11 +112,10 @@ async def run():
 asyncio.run(run())
 ```
 
-> **Known issue:** the energy flow is run with `solver="gurobi"` (hardcoded in
-> `base/monee.py`), which needs a Gurobi licence. With `monee` 1.1 the solver
-> string is no longer accepted (`AttributeError: 'str' object has no attribute
-> 'solve'`), so this example currently fails at world initialisation against
-> `monee>=1.1`.
+Energy flow uses monee's default solver (a local GEKKO solver, no external
+solver or licence needed). To use another one, call
+`energyflow(net, solver=...)` with a monee solver instance such as
+`monee.solver.PyomoSolver()`.
 
 ---
 
