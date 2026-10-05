@@ -10,7 +10,9 @@ Energy system simulation environments for [mango-agents](https://github.com/OFFI
 Two environments are available:
 
 - **Multi-energy restoration** — based on [`monee`](https://pypi.org/project/monee/)
-- **Power systems scheduling / economic dispatch** — based on [`pandapower`](https://pandapower.readthedocs.io/) + `scipy` (HiGHS)
+- **Power systems scheduling / economic dispatch** — two interchangeable backends behind one `SchedulingBehavior` contract:
+  - `PowerSystemsBehavior`, based on [`pandapower`](https://pandapower.readthedocs.io/) + `scipy` (HiGHS), with built-in copper-plate dispatch
+  - `PyPSABehavior`, based on [`PyPSA`](https://pypsa.org) (used by `energy-scheduling-benchmark`)
 
 ---
 
@@ -32,7 +34,7 @@ Or in development mode from the repository root:
 pip install -e .
 ```
 
-**Requirements:** Python ≥ 3.11, `mango-agents`, `monee`, `pandapower`, `scipy`, `networkx`, `pandas`, `numpy`, `highspy`.
+**Requirements:** Python ≥ 3.11, `mango-agents`, `monee`, `pandapower`, `pypsa`, `scipy`, `networkx`, `pandas`, `numpy`, `highspy`.
 
 ---
 
@@ -109,18 +111,30 @@ async def run():
 asyncio.run(run())
 ```
 
+> **Known issue:** the energy flow is run with `solver="gurobi"` (hardcoded in
+> `base/monee.py`), which needs a Gurobi licence. With `monee` 1.1 the solver
+> string is no longer accepted (`AttributeError: 'str' object has no attribute
+> 'solve'`), so this example currently fails at world initialisation against
+> `monee>=1.1`.
+
 ---
 
 ## Power Systems Scheduling Environment
 
-The scheduling environment wraps a `pandapower` network and replays time-series data as the simulation progresses.  It provides:
+The scheduling environment wraps a power network and replays time-series data as the simulation progresses.  Two backends implement the same `SchedulingBehavior` contract (component classification into `THERMAL`/`RENEWABLE`/`LOAD`/`STORAGE`, all addressed by `ComponentRef(element_type, component_id)`):
+
+| Backend | Network model | Classification | Extras |
+|---------|---------------|----------------|--------|
+| `PowerSystemsBehavior` | `pandapower` | by pandapower table | `solve_central()` — copper-plate economic dispatch (lossless, no network constraints) via HiGHS |
+| `PyPSABehavior` | `pypsa.Network` | generators by PyPSA `carrier` (`DEFAULT_RENEWABLE_CARRIERS`, overridable via `renewable_carriers=`) | `from_network(net)` auto-extracts timeseries from `generators_t`/`loads_t`/`storage_units_t` (`extract_timeseries`); `from_scenario(...)` |
+
+Both provide:
 
 - Automatic scheduling of per-component time-series updates at the correct simulation times.
-- Per-agent observers: `"active_power"`, `"max_active_power"`, `"statics"`.
+- Per-agent observers: `"active_power"`, `"max_active_power"`, `"statics"` (`PyPSABehavior` additionally exposes `"cost"`).
 - Per-agent regulate action for thermal generators, renewables, and storage.
-- `solve_central()` — copper-plate economic dispatch (lossless, no network constraints) via HiGHS.
 
-### Example
+### Example (pandapower)
 
 ```python
 import asyncio
@@ -176,7 +190,7 @@ async def run():
     for ref in behavior.get_components_by_type([LOAD]):
         agent = RoleAgent()
         agent.add_role(LoadMonitor())
-        world.register(agent, suggested_aid=f"load-{ref.index}")
+        world.register(agent, suggested_aid=f"load-{ref.component_id}")
         world.environment.install(agent, id=ref)
 
     async with world:
@@ -188,6 +202,31 @@ async def run():
 
 asyncio.run(run())
 ```
+
+### Example (PyPSA)
+
+```python
+import pandas as pd
+import pypsa
+
+from mango_energy_environments import LOAD, RENEWABLE, THERMAL, PyPSABehavior
+
+net = pypsa.Network()
+net.set_snapshots(pd.date_range("2024-01-01", periods=24, freq="h"))
+net.add("Bus", "b0")
+net.add("Generator", "coal", bus="b0", p_nom=10.0, marginal_cost=30.0, carrier="coal")
+net.add("Generator", "pv", bus="b0", p_nom=5.0, carrier="solar",
+        p_max_pu=[max(0.0, 1 - abs(h - 12) / 6) for h in range(24)])
+net.add("Load", "l0", bus="b0", p_set=[4.0 + 0.1 * h for h in range(24)])
+
+# Timeseries are extracted from generators_t.p_max_pu / loads_t.p_set automatically;
+# "solar" is in DEFAULT_RENEWABLE_CARRIERS, so "pv" is classified as RENEWABLE.
+behavior = PyPSABehavior.from_network(net)
+for ref in behavior.get_components_by_type([THERMAL, RENEWABLE, LOAD]):
+    print(ref.element_type, ref.component_id)
+```
+
+The resulting behavior is used with `create_world(...)` / `world.environment.install(agent, id=ref)` exactly like the pandapower one above.
 
 ---
 
