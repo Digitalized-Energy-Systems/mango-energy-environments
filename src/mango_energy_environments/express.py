@@ -161,10 +161,10 @@ def enable_poisson_com_for_monee(
 
     for node in monee_net.nodes:
         aids = []
-        if node.tid in world._agents:
+        if node.tid in world.agents:
             aids.append(node.tid)
         for child in monee_net.childs_by_ids(node.child_ids):
-            if child.tid in world._agents:
+            if child.tid in world.agents:
                 aids.append(child.tid)
         topo_node = len(aid_graph)
         aid_graph.add_node(topo_node, aids=aids, monee_id=node.id)
@@ -182,7 +182,7 @@ def enable_poisson_com_for_monee(
             return f"node-{parts[1]}"
         return aid
 
-    all_aids = list(world._agents.keys())
+    all_aids = list(world.agents.keys())
 
     aid_to_node: dict[str, int] = {}
     for topo_node, data in aid_graph.nodes(data=True):
