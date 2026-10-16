@@ -123,8 +123,13 @@ class SchedulingBehaviorBase(Behavior):
         Expected keyword arguments
         --------------------------
         id:
-            A :class:`ComponentRef` or ``(element_type, id)`` tuple.
+            A :class:`ComponentRef` or ``(element_type, id)`` tuple. Without
+            it the agent is not bound to a component and nothing is wired up:
+            mango's ``world.register`` installs *every* agent, including ones
+            (e.g. a leader or watcher) that have no component of their own.
         """
+        if "id" not in kwargs:
+            return
         raw_id = kwargs["id"]
         ref = raw_id if isinstance(raw_id, ComponentRef) else ComponentRef(*raw_id)
 

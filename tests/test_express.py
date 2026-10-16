@@ -109,7 +109,7 @@ class TestEnablePoissonComForMonee:
     async def test_directed_edge_delays_cover_all_agent_pairs(self, example_net):
         world = self._world_with_node_agents(example_net)
         enable_poisson_com_for_monee(world, example_net, base_delay_per_message=5.0)
-        aids = list(world._agents.keys())
+        aids = list(world.agents.keys())
         edge_dict = world.communication_sim.delay_s_directed_edge_dict
         for sender in aids:
             for receiver in aids:
