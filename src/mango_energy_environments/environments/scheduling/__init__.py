@@ -15,6 +15,12 @@ from .base import (
 )
 from .power_systems_scheduling import PowerSystemsBehavior
 from .pypsa_scheduling import PyPSABehavior, extract_timeseries
+from .topology import (
+    TOPOLOGIES,
+    TopologyCommunicationSimulation,
+    build_communication_graph,
+    bus_graph,
+)
 
 __all__ = [
     "PowerUpdateInfo",
@@ -31,4 +37,8 @@ __all__ = [
     "PowerSystemsBehavior",
     "PyPSABehavior",
     "extract_timeseries",
+    "TOPOLOGIES",
+    "TopologyCommunicationSimulation",
+    "build_communication_graph",
+    "bus_graph",
 ]
