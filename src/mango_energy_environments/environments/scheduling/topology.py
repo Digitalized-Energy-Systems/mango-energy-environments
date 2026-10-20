@@ -6,13 +6,8 @@ nodes are :class:`ComponentRef` s and whose edges are direct communication links
 * ``complete`` — every component links to every other one.
 * ``ring`` — the *participants* (the agents taking part in the distributed
   algorithm) form a cycle ordered by component id.
-* ``grid`` — follows the electrical network: participants on one bus are fully
-  connected, and every participant on bus A links to every participant on bus B
-  when A and B are joined by a line, link or transformer. Buses without
-  participants are passed through (their neighbours become neighbours), and
-  disconnected islands are bridged so the graph stays connected.
 
-In ``ring`` and ``grid`` the *attached* components (e.g. loads, which only report
+In ``ring`` the *attached* components (e.g. loads, which only report
 to a leader) connect via their bus: to every participant on their own bus, or on
 the nearest bus that has participants.
 
@@ -26,7 +21,6 @@ from __future__ import annotations
 
 import logging
 import random
-from collections import deque
 from collections.abc import Hashable, Iterable, Mapping, Sequence
 from typing import Any
 
@@ -42,7 +36,7 @@ from .base import ComponentRef
 
 logger = logging.getLogger(__name__)
 
-TOPOLOGIES = ("complete", "ring", "grid")
+TOPOLOGIES = ("complete", "ring")
 
 #: PyPSA branch components that join two buses (``bus0`` / ``bus1``).
 BRANCH_COMPONENTS = ("lines", "links", "transformers")
@@ -74,26 +68,6 @@ def _sort_key(ref: ComponentRef) -> tuple[str, str]:
     return (str(ref.component_id), str(ref.element_type))
 
 
-def _participant_bus_graph(buses: nx.Graph, participant_buses: set[str]) -> nx.Graph:
-    """Buses with participants; adjacent if a path joins them through buses without."""
-    graph = nx.Graph()
-    graph.add_nodes_from(participant_buses)
-    for start in participant_buses:
-        seen = {start}
-        queue = deque([start])
-        while queue:
-            bus = queue.popleft()
-            for nxt in buses.neighbors(bus):
-                if nxt in seen:
-                    continue
-                seen.add(nxt)
-                if nxt in participant_buses:
-                    graph.add_edge(start, nxt)
-                else:
-                    queue.append(nxt)
-    return graph
-
-
 def _nearest_participant_bus(
     buses: nx.Graph, bus: str, participant_buses: set[str]
 ) -> str:
@@ -123,7 +97,7 @@ def build_communication_graph(
 
     :param kind: one of :data:`TOPOLOGIES`.
     :param net: the ``pypsa.Network`` (buses and branches; only used by
-        ``ring``/``grid``).
+        ``ring``).
     :param participants: components running the distributed algorithm.
     :param attached: components that only talk to others (e.g. loads).
     :param bus_of: bus per component; defaults to the ``bus`` column of the
@@ -149,29 +123,11 @@ def build_communication_graph(
     for ref in participants:
         by_bus.setdefault(str(bus_of[ref]), []).append(ref)
 
-    if kind == "ring":
-        ordered = sorted(participants, key=_sort_key)
-        if len(ordered) == 2:
-            graph.add_edge(ordered[0], ordered[1])
-        elif len(ordered) > 2:
-            nx.add_cycle(graph, ordered)
-    else:  # grid
-        for refs in by_bus.values():
-            _connect_all(graph, refs, refs)
-        pbuses = _participant_bus_graph(buses, set(by_bus))
-        for a, b in pbuses.edges:
-            _connect_all(graph, by_bus[a], by_bus[b])
-        islands = sorted(
-            (sorted(c) for c in nx.connected_components(pbuses)), key=lambda c: c[0]
-        )
-        if len(islands) > 1:
-            logger.warning(
-                "grid topology: %d disconnected bus islands; bridging them at their "
-                "lowest-named buses",
-                len(islands),
-            )
-        for left, right in zip(islands, islands[1:], strict=False):
-            _connect_all(graph, by_bus[left[0]], by_bus[right[0]])
+    ordered = sorted(participants, key=_sort_key)
+    if len(ordered) == 2:
+        graph.add_edge(ordered[0], ordered[1])
+    elif len(ordered) > 2:
+        nx.add_cycle(graph, ordered)
 
     if by_bus:
         pbus_set = set(by_bus)

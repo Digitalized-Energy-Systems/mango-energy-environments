@@ -77,30 +77,16 @@ class TestRingTopology:
         graph = build_communication_graph("ring", _net(), [G[0], G[1]])
         assert graph.number_of_edges() == 1
 
-
-class TestGridTopology:
-    def test_bus_cliques_and_neighbouring_buses(self):
-        graph = build_communication_graph("grid", _net(), PARTICIPANTS, LOADS)
-        sub = graph.subgraph(PARTICIPANTS)
-        assert sub.has_edge(G[0], G[1])  # same bus
-        assert sub.has_edge(G[2], S3)  # link b2 - b3
-        # b1 hosts no participant: b0 and b2 become neighbours through it
-        assert sub.has_edge(G[0], G[2]) and sub.has_edge(G[1], G[2])
-        assert not sub.has_edge(G[0], S3)
-
-    def test_islands_bridged_so_participants_connected(self):
-        graph = build_communication_graph("grid", _net(), PARTICIPANTS, LOADS)
-        assert nx.is_connected(graph.subgraph(PARTICIPANTS))
-        assert set(graph[G[4]]) == {G[0], G[1]}  # b4 bridged to b0 (lowest name)
-
     def test_custom_bus_mapping(self):
-        bus_of = {G[0]: "b0", G[2]: "b2"}
-        graph = build_communication_graph("grid", _net(), [G[0], G[2]], bus_of=bus_of)
-        assert graph.has_edge(G[0], G[2])
+        bus_of = {G[0]: "b0", G[2]: "b2", D3: "b2"}
+        graph = build_communication_graph("ring", _net(), [G[0], G[2]], [D3], bus_of)
+        assert set(graph[D3]) == {G[2]}
 
-    def test_unknown_kind(self):
-        with pytest.raises(ValueError, match="unknown topology"):
-            build_communication_graph("star", _net(), PARTICIPANTS)
+
+@pytest.mark.parametrize("kind", ["grid", "star"])
+def test_unknown_kind(kind):
+    with pytest.raises(ValueError, match="unknown topology"):
+        build_communication_graph(kind, _net(), PARTICIPANTS)
 
 
 def _pkg(sender: str, receiver: str) -> MessagePackage:
