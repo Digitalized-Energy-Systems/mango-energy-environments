@@ -160,10 +160,6 @@ class SchedulingBehaviorBase(Behavior):
     def has_action(self, agent_id: str, action: str) -> bool:
         return action in self._actions.get(agent_id, {})
 
-    def has_timeseries(self, ref: ComponentRef) -> bool:
-        """Return True if *ref* has an entry in the replayed timeseries."""
-        return ref in self._timeseries
-
     def get_statics(self, ref: ComponentRef) -> dict:
         """Return the static component row for *ref* as a dict (empty if unknown).
 
