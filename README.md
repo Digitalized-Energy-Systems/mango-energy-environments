@@ -228,6 +228,14 @@ for ref in behavior.get_components_by_type([THERMAL, RENEWABLE, LOAD]):
 
 The resulting behavior is used with `create_world(...)` / `world.environment.install(agent, id=ref)` exactly like the pandapower one above.
 
+### Communication topology
+
+`build_communication_graph(kind, net, participants, attached=(), bus_of=None)` builds a
+`networkx` communication graph over scheduling components (`"complete"`, or `"ring"` ordered
+by component id; `attached` components such as loads connect via their bus). `TopologyCommunicationSimulation` is a mango
+`CommunicationSimulation` that delivers every message along the shortest path in that graph,
+taking hops × delay and applying the loss rate per hop.
+
 ---
 
 ## Express API
