@@ -77,7 +77,7 @@ class BranchFailureHandler(Role):
         if isinstance(event, BranchFailureEvent):
             self.counter += 1
             for neighbor in self.context.neighbors():
-                self.context.send_message("Failure attention!", neighbor)
+                self.context.schedule_instant_message("Failure attention!", neighbor)
 
     def handle_message(self, content, meta):
         if isinstance(content, str):
