@@ -7,10 +7,14 @@
 
 Energy system simulation environments for [mango-agents](https://github.com/OFFIS-DAI/mango), the Python multi-agent systems framework.
 
-Two environments are available:
+Three environments are available:
 
 - **Multi-energy restoration** — based on [`monee`](https://pypi.org/project/monee/)
 - **Power systems scheduling** — based on [`pandapower`](https://pandapower.readthedocs.io/)
+- **Copper plate** — no physics: energy moves freely between all components (one balance pool per
+  time step); lines only decide which agents are connected (`connection_graph` → mango
+  `graph_topology`). Agents observe whole-horizon arrays (`statics`, `p_min`, `p_max`/`demand`) and
+  act with `set_schedule`; `CopperPlateBehavior.balance()` gives the residual per step.
 
 ---
 

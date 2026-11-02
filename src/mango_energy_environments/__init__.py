@@ -37,6 +37,12 @@ from mango_energy_environments.base.monee import (
     solve_load_shedding_optimization_relaxed,
     upper,
 )
+from mango_energy_environments.environments.copper_plate import (
+    Component,
+    CopperPlateBehavior,
+    CopperPlateNetwork,
+    connection_graph,
+)
 from mango_energy_environments.environments.restoration import (
     BranchFailureEvent,
     CustomFailureEvent,
@@ -88,6 +94,11 @@ __all__ = [
     "PowerUpdateInfo",
     "ComponentRef",
     "PowerSystemsBehavior",
+    # Copper plate
+    "Component",
+    "CopperPlateNetwork",
+    "CopperPlateBehavior",
+    "connection_graph",
     "calculate_initial_time",
     "get_possible_components",
     "get_components_by_type",
