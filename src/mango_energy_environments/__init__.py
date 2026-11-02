@@ -74,6 +74,11 @@ from mango_energy_environments.express import (
     create_small_benchmark_restoration_world,
     enable_poisson_com_for_monee,
 )
+from mango_energy_environments.pypsa_preparation import (
+    add_quadratic_cost,
+    drop_unusable_units,
+    set_storage_defaults,
+)
 
 __all__ = [
     # Restoration
@@ -101,6 +106,10 @@ __all__ = [
     "CopperPlateBehavior",
     "connection_graph",
     "from_pypsa",
+    # PyPSA preparation
+    "drop_unusable_units",
+    "add_quadratic_cost",
+    "set_storage_defaults",
     "calculate_initial_time",
     "get_possible_components",
     "get_components_by_type",

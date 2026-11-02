@@ -17,6 +17,9 @@ Three environments are available:
   act with `set_schedule`; `CopperPlateBehavior.balance()` gives the residual per step.
   `from_pypsa(pypsa.Network(path))` converts a PyPSA network file (install extra `[pypsa]`):
   renewable = generator with an hourly `p_max_pu` profile; lines and links both connect agents.
+  Preparation steps on the PyPSA network before converting (`pypsa_preparation`):
+  `drop_unusable_units`, `add_quadratic_cost(n, k)` (c₂ = k·c₁/p_nom on thermal units),
+  `set_storage_defaults(n, max_hours, soc_initial)`.
 
 ---
 
