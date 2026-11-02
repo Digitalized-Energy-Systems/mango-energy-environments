@@ -117,3 +117,22 @@ def test_from_pypsa(caplog):
     assert cp.lines == [("b0", "b1"), ("b1", "b2")]
     assert len(cp.time_index) == T
     assert "1 Store ignored" in caplog.text
+
+
+def test_from_pypsa_drops_buses_without_components(caplog):
+    pypsa = pytest.importorskip("pypsa")
+    from mango_energy_environments.environments.copper_plate import from_pypsa
+
+    n = pypsa.Network()
+    n.set_snapshots(pd.date_range("2024-01-01", periods=T, freq="h"))
+    for b in ("b0", "b1", "b2"):
+        n.add("Bus", b)
+    n.add("Line", "l01", bus0="b0", bus1="b1", x=0.1, s_nom=100)
+    n.add("Line", "l12", bus0="b1", bus1="b2", x=0.1, s_nom=100)
+    n.add("Generator", "g", bus="b0", p_nom=10)
+    n.add("Load", "d", bus="b2", p_set=1.0)
+
+    cp = from_pypsa(n)
+
+    assert cp.lines == []
+    assert "1 buses without components dropped: ['b1']" in caplog.text

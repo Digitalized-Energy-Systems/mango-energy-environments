@@ -61,7 +61,9 @@ def scale_to_targets(n, targets: dict[str, float]) -> None:
     """Raise the total ``p_nom`` per carrier (generators and storage units) to *targets* [MW].
 
     The increase is spread in proportion to each unit's ``p_nom_max − p_nom`` headroom (evenly
-    when there is none). Carriers already at or above their target are left alone.
+    when the total headroom is zero or infinite). Carriers already at or above their target are
+    left alone. Generators and storage units are scaled separately, so a carrier must belong to
+    only one of them (else both are raised to the target).
     """
     for carrier, target in targets.items():
         for component, df in (

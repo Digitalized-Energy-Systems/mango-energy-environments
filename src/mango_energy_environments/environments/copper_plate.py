@@ -75,7 +75,8 @@ def from_pypsa(n) -> CopperPlateNetwork:
     """Convert a ``pypsa.Network`` into a copper-plate network (full horizon; cut by the caller).
 
     Renewable = generator with an hourly ``p_max_pu`` profile, else thermal. Lines and links both
-    count as connections. Storage data goes into ``params`` as-is.
+    count as connections. Storage data goes into ``params`` as-is. Buses without components are
+    dropped with their lines (a warning names them), so they do not connect their neighbours.
     """
     # shortcut: static marginal cost only and single-period snapshots; extend when a network needs it.
     for c in n.components:
@@ -131,7 +132,17 @@ def from_pypsa(n) -> CopperPlateNetwork:
             ),
         )
 
-    lines = [*zip(n.lines.bus0, n.lines.bus1), *zip(n.links.bus0, n.links.bus1)]
+    used = {c.bus for c in components.values()}
+    empty = sorted(set(n.buses.index) - used)
+    if empty:
+        logger.warning(
+            "from_pypsa: %d buses without components dropped: %s", len(empty), empty
+        )
+    lines = [
+        (a, b)
+        for a, b in [*zip(n.lines.bus0, n.lines.bus1), *zip(n.links.bus0, n.links.bus1)]
+        if a in used and b in used
+    ]
     return CopperPlateNetwork(n.snapshots, components, lines)
 
 
