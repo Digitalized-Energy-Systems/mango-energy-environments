@@ -77,6 +77,8 @@ from mango_energy_environments.express import (
 from mango_energy_environments.pypsa_preparation import (
     add_quadratic_cost,
     drop_unusable_units,
+    keep_buses,
+    scale_to_targets,
     set_storage_defaults,
 )
 
@@ -110,6 +112,8 @@ __all__ = [
     "drop_unusable_units",
     "add_quadratic_cost",
     "set_storage_defaults",
+    "scale_to_targets",
+    "keep_buses",
     "calculate_initial_time",
     "get_possible_components",
     "get_components_by_type",

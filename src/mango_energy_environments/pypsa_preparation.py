@@ -6,9 +6,17 @@ Generic: every benchmark value (cost factor, storage hours, carriers to drop) is
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 
-__all__ = ["drop_unusable_units", "add_quadratic_cost", "set_storage_defaults"]
+__all__ = [
+    "drop_unusable_units",
+    "add_quadratic_cost",
+    "set_storage_defaults",
+    "scale_to_targets",
+    "keep_buses",
+]
 
 
 def drop_unusable_units(n, storage_carriers: tuple[str, ...] = ()) -> None:
@@ -47,3 +55,39 @@ def set_storage_defaults(
         n.storage_units["state_of_charge_initial"] = (
             soc_initial * su.p_nom * su.max_hours
         )
+
+
+def scale_to_targets(n, targets: dict[str, float]) -> None:
+    """Raise the total ``p_nom`` per carrier (generators and storage units) to *targets* [MW].
+
+    The increase is spread in proportion to each unit's ``p_nom_max − p_nom`` headroom (evenly
+    when there is none). Carriers already at or above their target are left alone.
+    """
+    for carrier, target in targets.items():
+        for component, df in (
+            ("Generator", n.generators),
+            ("StorageUnit", n.storage_units),
+        ):
+            sel = df.index[df.carrier == carrier]
+            current = df.loc[sel, "p_nom"].sum()
+            if len(sel) == 0 or current >= target:
+                continue
+            headroom = (df.loc[sel, "p_nom_max"] - df.loc[sel, "p_nom"]).clip(lower=0)
+            total = headroom.sum()
+            weights = headroom / total if 0 < total < np.inf else 1.0 / len(sel)
+            n.components[component].static.loc[sel, "p_nom"] += (
+                target - current
+            ) * weights
+
+
+def keep_buses(n, buses) -> None:
+    """Keep only *buses*: drop every other bus, the elements attached to it and every branch
+    with an end outside."""
+    drop = n.buses.index.difference(buses)
+    for c in n.components:
+        if c.name == "Bus" or c.static.empty:
+            continue
+        cols = [col for col in c.static.columns if re.fullmatch(r"bus\d*", col)]
+        if cols:
+            n.remove(c.name, c.static.index[c.static[cols].isin(drop).any(axis=1)])
+    n.remove("Bus", drop)

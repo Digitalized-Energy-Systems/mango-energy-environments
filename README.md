@@ -19,7 +19,8 @@ Three environments are available:
   renewable = generator with an hourly `p_max_pu` profile; lines and links both connect agents.
   Preparation steps on the PyPSA network before converting (`pypsa_preparation`):
   `drop_unusable_units`, `add_quadratic_cost(n, k)` (c₂ = k·c₁/p_nom on thermal units),
-  `set_storage_defaults(n, max_hours, soc_initial)`.
+  `set_storage_defaults(n, max_hours, soc_initial)`, `scale_to_targets(n, {carrier: MW})`,
+  `keep_buses(n, buses)` (cut out a region).
 
 ---
 
