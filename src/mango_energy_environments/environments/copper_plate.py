@@ -128,6 +128,7 @@ def from_pypsa(n) -> CopperPlateNetwork:
                     "efficiency_store": float(su.efficiency_store),
                     "efficiency_dispatch": float(su.efficiency_dispatch),
                     "state_of_charge_initial": float(su.state_of_charge_initial),
+                    "p_nom": float(su.p_nom),
                 },
             ),
         )

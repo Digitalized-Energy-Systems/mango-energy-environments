@@ -114,6 +114,7 @@ def test_from_pypsa(caplog):
     np.testing.assert_array_equal(cp.components["bat"].p_min, flat(-2))
     assert cp.components["coal"].cost == (20.0, 0.1)
     assert cp.components["bat"].params["max_hours"] == 2.0
+    assert cp.components["bat"].params["p_nom"] == 2.0
     assert cp.lines == [("b0", "b1"), ("b1", "b2")]
     assert len(cp.time_index) == T
     assert "1 Store ignored" in caplog.text
