@@ -51,6 +51,7 @@ class PowerLoadMonitoring(Role):
     """Counts PowerUpdateInfo events received by the agent."""
 
     def __init__(self):
+        super().__init__()
         self.counter = 0
 
     def on_agent_event(self, event):
@@ -102,9 +103,7 @@ class TestPowerSystemsBehaviorUnit:
 
     def test_calculate_initial_time(self, power_net_with_timeseries):
         net, g0, l0, ts, start = power_net_with_timeseries
-        behavior = PowerSystemsBehavior(
-            net=net, timeseries=ts, start_datetime=start
-        )
+        behavior = PowerSystemsBehavior(net=net, timeseries=ts, start_datetime=start)
         assert calculate_initial_time(behavior) == start
 
     def test_get_components_by_type_wrapper(self, simple_power_net):
@@ -134,10 +133,22 @@ class TestPowerSystemsBehaviorUnit:
     def test_timeseries_key_normalisation(self, simple_power_net):
         """Both ComponentRef and tuple keys are accepted."""
         net, g0, l0 = simple_power_net
-        ts_ref = {ComponentRef(THERMAL, g0): pd.Series([1.0], index=pd.date_range("2024-01-01", periods=1, freq="h"))}
-        ts_tup = {(THERMAL, g0): pd.Series([1.0], index=pd.date_range("2024-01-01", periods=1, freq="h"))}
-        b_ref = PowerSystemsBehavior(net=net, timeseries=ts_ref, start_datetime=datetime(2024, 1, 1))
-        b_tup = PowerSystemsBehavior(net=net, timeseries=ts_tup, start_datetime=datetime(2024, 1, 1))
+        ts_ref = {
+            ComponentRef(THERMAL, g0): pd.Series(
+                [1.0], index=pd.date_range("2024-01-01", periods=1, freq="h")
+            )
+        }
+        ts_tup = {
+            (THERMAL, g0): pd.Series(
+                [1.0], index=pd.date_range("2024-01-01", periods=1, freq="h")
+            )
+        }
+        b_ref = PowerSystemsBehavior(
+            net=net, timeseries=ts_ref, start_datetime=datetime(2024, 1, 1)
+        )
+        b_tup = PowerSystemsBehavior(
+            net=net, timeseries=ts_tup, start_datetime=datetime(2024, 1, 1)
+        )
         assert b_ref._timeseries.keys() == b_tup._timeseries.keys()
 
 
@@ -162,8 +173,7 @@ class TestObserversAndActions:
         environment = DefaultEnvironment(behavior=behavior)
         world = create_world(start_time=0.0, environment=environment)
         agent = RoleAgent()
-        world.register(agent, suggested_aid="gen-agent")
-        world.environment.install(agent, id=ref)
+        world.register(agent, suggested_aid="gen-agent", id=ref)
 
         result = behavior.observe(agent.aid, "statics")
         assert isinstance(result, dict)
@@ -176,8 +186,7 @@ class TestObserversAndActions:
         environment = DefaultEnvironment(behavior=behavior)
         world = create_world(start_time=0.0, environment=environment)
         agent = RoleAgent()
-        world.register(agent, suggested_aid="gen-agent")
-        world.environment.install(agent, id=ref)
+        world.register(agent, suggested_aid="gen-agent", id=ref)
 
         p = behavior.observe(agent.aid, "active_power")
         assert p == pytest.approx(5.0)
@@ -189,8 +198,7 @@ class TestObserversAndActions:
         environment = DefaultEnvironment(behavior=behavior)
         world = create_world(start_time=0.0, environment=environment)
         agent = RoleAgent()
-        world.register(agent, suggested_aid="gen-agent")
-        world.environment.install(agent, id=ref)
+        world.register(agent, suggested_aid="gen-agent", id=ref)
 
         pmax = behavior.observe(agent.aid, "max_active_power")
         assert pmax == pytest.approx(10.0)
@@ -202,8 +210,7 @@ class TestObserversAndActions:
         environment = DefaultEnvironment(behavior=behavior)
         world = create_world(start_time=0.0, environment=environment)
         agent = RoleAgent()
-        world.register(agent, suggested_aid="gen-agent")
-        world.environment.install(agent, id=ref)
+        world.register(agent, suggested_aid="gen-agent", id=ref)
 
         assert behavior.has_action(agent.aid, "regulate")
         behavior.act(agent.aid, "regulate", 3.0)
@@ -216,8 +223,7 @@ class TestObserversAndActions:
         environment = DefaultEnvironment(behavior=behavior)
         world = create_world(start_time=0.0, environment=environment)
         agent = RoleAgent()
-        world.register(agent, suggested_aid="load-agent")
-        world.environment.install(agent, id=ref)
+        world.register(agent, suggested_aid="load-agent", id=ref)
 
         assert not behavior.has_action(agent.aid, "regulate")
 
@@ -228,8 +234,7 @@ class TestObserversAndActions:
         environment = DefaultEnvironment(behavior=behavior)
         world = create_world(start_time=0.0, environment=environment)
         agent = RoleAgent()
-        world.register(agent, suggested_aid="sgen-agent")
-        world.environment.install(agent, id=ref)
+        world.register(agent, suggested_aid="sgen-agent", id=ref)
 
         assert behavior.has_action(agent.aid, "regulate")
         behavior.act(agent.aid, "regulate", 15.0)
@@ -242,8 +247,7 @@ class TestObserversAndActions:
         environment = DefaultEnvironment(behavior=behavior)
         world = create_world(start_time=0.0, environment=environment)
         agent = RoleAgent()
-        world.register(agent, suggested_aid="storage-agent")
-        world.environment.install(agent, id=ref)
+        world.register(agent, suggested_aid="storage-agent", id=ref)
 
         assert behavior.has_action(agent.aid, "regulate")
         behavior.act(agent.aid, "regulate", -10.0)
@@ -281,7 +285,9 @@ async def test_power_systems_shallow(five_bus_net):
     )
     environment = DefaultEnvironment(behavior=behavior)
     com_sim = SimpleCommunicationSimulation(default_delay_s=0.1, loss_percent=0.0)
-    world = create_world(start_time=0.0, communication_sim=com_sim, environment=environment)
+    world = create_world(
+        start_time=0.0, communication_sim=com_sim, environment=environment
+    )
 
     # Register load agents with monitoring role (mirrors Julia test)
     load_refs = behavior.get_components_by_type([LOAD])
@@ -290,17 +296,14 @@ async def test_power_systems_shallow(five_bus_net):
         agent = RoleAgent()
         monitor = PowerLoadMonitoring()
         agent.add_role(monitor)
-        world.register(agent, suggested_aid=f"load-{ref.index}")
-        world.environment.install(agent, id=ref)
+        world.register(agent, suggested_aid=f"load-{ref.index}", id=ref)
         load_agents.append((agent, monitor))
 
     # Register a renewable agent to capture its update events
     sgen_agent = RoleAgent()
     sgen_monitor = PowerLoadMonitoring()
     sgen_agent.add_role(sgen_monitor)
-    world.register(sgen_agent, suggested_aid="sgen-0")
-    sgen_ref = ComponentRef(RENEWABLE, sg0)
-    world.environment.install(sgen_agent, id=sgen_ref)
+    world.register(sgen_agent, suggested_aid="sgen-0", id=ComponentRef(RENEWABLE, sg0))
 
     # Simulate 3 days (3 × 86400 s); timeseries is hourly so 72 events total
     three_days_s = 3 * 24 * 3600.0
@@ -335,8 +338,7 @@ async def test_timeseries_updates_max_power(power_net_with_timeseries):
     gen_agent = RoleAgent()
     gen_monitor = PowerLoadMonitoring()
     gen_agent.add_role(gen_monitor)
-    world.register(gen_agent, suggested_aid="gen-agent")
-    world.environment.install(gen_agent, id=ComponentRef(THERMAL, g0))
+    world.register(gen_agent, suggested_aid="gen-agent", id=ComponentRef(THERMAL, g0))
 
     # Run for 3 hours: events fire at t=0 (on init), t=3600, t=7200, t=10800 (4 total)
     async with world:

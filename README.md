@@ -192,8 +192,7 @@ async def run():
     for ref in behavior.get_components_by_type([LOAD]):
         agent = RoleAgent()
         agent.add_role(LoadMonitor())
-        world.register(agent, suggested_aid=f"load-{ref.index}")
-        world.environment.install(agent, id=ref)
+        world.register(agent, suggested_aid=f"load-{ref.index}", id=ref)
 
     async with world:
         await discrete_step_until(world, max_advance_time_s=3 * 3600.0)
