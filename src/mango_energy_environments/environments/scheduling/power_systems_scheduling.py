@@ -1,7 +1,6 @@
 """Power systems scheduling environment.
 
-Uses **pandapower** as the power system data model and **HiGHS** (via scipy)
-for copper-plate economic dispatch.
+Uses **pandapower** as the power system data model.
 """
 
 from __future__ import annotations
@@ -213,87 +212,6 @@ class PowerSystemsBehavior(Behavior):
     def calculate_initial_time(self) -> datetime:
         """Return the earliest timeseries timestamp across all managed components."""
         return self._earliest_timestamp()
-
-    def solve_central(self) -> dict:
-        """Solve a copper-plate economic dispatch (lossless, no network constraints).
-
-        Minimises generation cost subject to:
-
-        - Power balance: total generation = total fixed load − fixed renewables.
-        - Generator limits: ``min_p_mw ≤ p_mw ≤ max_p_mw``.
-        - Storage limits: ``min_p_mw ≤ p_mw ≤ max_p_mw`` (only when STORAGE
-          is in :attr:`relevant_types`).
-
-        Returns
-        -------
-        dict with keys ``"success"`` (bool), ``"net"`` (updated network),
-        ``"objective"`` (float).
-        """
-        from scipy.optimize import linprog
-
-        controllable: list[tuple[str, int]] = []
-        costs: list[float] = []
-        p_min: list[float] = []
-        p_max: list[float] = []
-
-        for et in (THERMAL, STORAGE):
-            if et not in self._relevant_types:
-                continue
-            df = getattr(self._net, et, None)
-            if df is None or df.empty:
-                continue
-            active = df[df.get(_COL_IN_SERVICE, pd.Series(True, index=df.index))]
-            for idx, row in active.iterrows():
-                controllable.append((et, idx))
-                costs.append(float(row.get("cost_per_mw", 1.0)))
-                p_min.append(float(row.get(_COL_MIN_P_MW, 0.0)))
-                p_max.append(float(row.get(_COL_MAX_P_MW, row.get(_COL_P_MW, 0.0))))
-
-        if not controllable:
-            logger.warning("solve_central: no controllable generators found")
-            return {"success": False, "net": self._net, "objective": float("nan")}
-
-        sgen_df = getattr(self._net, RENEWABLE, None)
-        fixed_gen_mw = 0.0
-        if sgen_df is not None and not sgen_df.empty and RENEWABLE in self._relevant_types:
-            active_sgen = sgen_df[
-                sgen_df.get(_COL_IN_SERVICE, pd.Series(True, index=sgen_df.index))
-            ]
-            fixed_gen_mw = float(active_sgen[_COL_P_MW].sum())
-
-        load_df = getattr(self._net, LOAD, None)
-        total_demand_mw = 0.0
-        if load_df is not None and not load_df.empty:
-            active_load = load_df[
-                load_df.get(_COL_IN_SERVICE, pd.Series(True, index=load_df.index))
-            ]
-            total_demand_mw = float(active_load[_COL_P_MW].sum())
-
-        net_demand_mw = total_demand_mw - fixed_gen_mw
-
-        result = linprog(
-            costs,
-            A_eq=[[1.0] * len(controllable)],
-            b_eq=[net_demand_mw],
-            bounds=list(zip(p_min, p_max)),
-            method="highs",
-        )
-
-        if result.success:
-            for i, (et, idx) in enumerate(controllable):
-                getattr(self._net, et).at[idx, _COL_P_MW] = result.x[i]
-            logger.info(
-                "solve_central: dispatch successful, objective=%.4f MW·cost",
-                result.fun,
-            )
-        else:
-            logger.warning("solve_central: LP failed — %s", result.message)
-
-        return {
-            "success": result.success,
-            "net": self._net,
-            "objective": result.fun if result.success else float("nan"),
-        }
 
     async def _update_coro(
         self,

@@ -10,7 +10,7 @@ Energy system simulation environments for [mango-agents](https://github.com/OFFI
 Two environments are available:
 
 - **Multi-energy restoration** — based on [`monee`](https://pypi.org/project/monee/)
-- **Power systems scheduling / economic dispatch** — based on [`pandapower`](https://pandapower.readthedocs.io/) + `scipy` (HiGHS)
+- **Power systems scheduling** — based on [`pandapower`](https://pandapower.readthedocs.io/)
 
 ---
 
@@ -49,7 +49,7 @@ Or in development mode from the repository root:
 pip install -e .
 ```
 
-**Requirements:** Python ≥ 3.11, `mango-agents`, `monee`, `pandapower`, `scipy`, `networkx`, `pandas`, `numpy`, `highspy`.
+**Requirements:** Python ≥ 3.11, `mango-agents`, `monee`, `pandapower`, `networkx`, `pandas`, `numpy`.
 
 ---
 
@@ -135,7 +135,6 @@ The scheduling environment wraps a `pandapower` network and replays time-series 
 - Automatic scheduling of per-component time-series updates at the correct simulation times.
 - Per-agent observers: `"active_power"`, `"max_active_power"`, `"statics"`.
 - Per-agent regulate action for thermal generators, renewables, and storage.
-- `solve_central()` — copper-plate economic dispatch (lossless, no network constraints) via HiGHS.
 
 ### Example
 
@@ -198,9 +197,6 @@ async def run():
 
     async with world:
         await discrete_step_until(world, max_advance_time_s=3 * 3600.0)
-
-    result = behavior.solve_central()
-    print(f"Dispatch: success={result['success']}, p_gen={net.gen.at[g0, 'p_mw']:.2f} MW")
 
 
 asyncio.run(run())
