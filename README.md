@@ -15,6 +15,8 @@ Three environments are available:
   time step); lines only decide which agents are connected (`connection_graph` → mango
   `graph_topology`). Agents observe whole-horizon arrays (`statics`, `p_min`, `p_max`/`demand`) and
   act with `set_schedule`; `CopperPlateBehavior.balance()` gives the residual per step.
+  `from_pypsa(pypsa.Network(path))` converts a PyPSA network file (install extra `[pypsa]`):
+  renewable = generator with an hourly `p_max_pu` profile; lines and links both connect agents.
 
 ---
 

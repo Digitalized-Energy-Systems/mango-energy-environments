@@ -42,6 +42,7 @@ from mango_energy_environments.environments.copper_plate import (
     CopperPlateBehavior,
     CopperPlateNetwork,
     connection_graph,
+    from_pypsa,
 )
 from mango_energy_environments.environments.restoration import (
     BranchFailureEvent,
@@ -99,6 +100,7 @@ __all__ = [
     "CopperPlateNetwork",
     "CopperPlateBehavior",
     "connection_graph",
+    "from_pypsa",
     "calculate_initial_time",
     "get_possible_components",
     "get_components_by_type",

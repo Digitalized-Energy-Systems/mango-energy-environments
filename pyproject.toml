@@ -19,9 +19,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+pypsa = ["pypsa>=1.0"]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
+    "pypsa>=1.0",
 ]
 
 [tool.setuptools.packages.find]
