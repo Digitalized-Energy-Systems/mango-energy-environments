@@ -7,9 +7,13 @@ Whenever new code is written here, first invoke the ponytail skill (`ponytail:po
 
 ## Scope (IMPORTANT — check every change against it)
 
-- Owns: energy-network representation and simulation (PyPSA now, pandapower later), component
-  classification, time series, observe/act, component agents bound to network elements, generic
-  network loading + preparation steps (format adapters, cost model, slack detection, profiles).
+- Owns: energy-network representation and simulation in two modes — **physical** (real backend
+  frameworks: pandapower, monee, with their physical calculations) and **copper-plate** (no physics;
+  lines only define which agents are connected; energy moves freely between any actors; the
+  benchmark's main mode). Also: component classification, time series, observe/act, component
+  agents bound to network elements, network sources converted into backend networks (e.g.
+  PyPSA → pandapower), generic preparation steps (cost model, slack detection, profiles).
+- Keep existing functionality (monee restoration env, pandapower scheduling env, express API) working.
 - Must not contain: distributed-algorithm logic, economic-dispatch problem formulation,
   central-dispatch solver, benchmark datasets/runs. Never import distributed_resource_optimization.
 
