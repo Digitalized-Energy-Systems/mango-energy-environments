@@ -14,13 +14,10 @@ replicates the spirit: 2 thermal generators, 1 renewable, 2 loads, 1 storage.
 
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pandas as pd
-import pandapower as pp
 import pytest
-
 from mango.agent.role import Role, RoleAgent
 from mango.simulation.communication import SimpleCommunicationSimulation
 from mango.simulation.environment import DefaultEnvironment
@@ -40,7 +37,6 @@ from mango_energy_environments.environments.scheduling import (
     STORAGE,
     THERMAL,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helper role (mirrors Julia's @role struct PowerLoadMonitoring)

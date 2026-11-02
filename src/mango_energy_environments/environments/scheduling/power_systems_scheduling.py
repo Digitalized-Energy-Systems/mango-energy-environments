@@ -7,12 +7,11 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 import pandas as pd
-
 from mango.simulation.environment import Behavior, Environment
 from mango.util.clock import Clock
 
@@ -116,7 +115,7 @@ class PowerSystemsBehavior(Behavior):
         elif self._timeseries:
             self._start_dt = self._earliest_timestamp()
         else:
-            self._start_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+            self._start_dt = datetime.now(UTC).replace(tzinfo=None)
 
         # aid -> {obs_name: Callable[[], Any]}
         self._observers: dict[str, dict[str, Callable[[], Any]]] = {}
@@ -135,7 +134,9 @@ class PowerSystemsBehavior(Behavior):
 
     def initialize(self, environment: Environment, clock: Clock) -> None:
         """Schedule each timeseries point as an agent-managed task."""
-        logger.debug("PowerSystemsBehavior: scheduling timeseries tasks via agent schedulers")
+        logger.debug(
+            "PowerSystemsBehavior: scheduling timeseries tasks via agent schedulers"
+        )
         count = 0
         for ref, series in self._timeseries.items():
             if ref.element_type not in self._relevant_types:
@@ -245,6 +246,7 @@ class PowerSystemsBehavior(Behavior):
         actions: dict[str, Callable] = {}
 
         if et in (THERMAL, RENEWABLE, STORAGE):
+
             def regulate(active_power_mw: float) -> None:
                 getattr(self._net, et).at[idx, _COL_P_MW] = active_power_mw
 
@@ -282,7 +284,7 @@ class PowerSystemsBehavior(Behavior):
             dt = first.to_pydatetime() if hasattr(first, "to_pydatetime") else first
             if earliest is None or dt < earliest:
                 earliest = dt
-        return earliest or datetime.now(timezone.utc).replace(tzinfo=None)
+        return earliest or datetime.now(UTC).replace(tzinfo=None)
 
 
 def calculate_initial_time(behavior: PowerSystemsBehavior) -> datetime:

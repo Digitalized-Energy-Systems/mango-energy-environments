@@ -104,7 +104,9 @@ async def run():
     environment = DefaultEnvironment(behavior=behavior)
     com_sim = SimpleCommunicationSimulation(default_delay_s=0.02)
 
-    world = create_world(start_time=0.0, communication_sim=com_sim, environment=environment)
+    world = create_world(
+        start_time=0.0, communication_sim=com_sim, environment=environment
+    )
 
     for node in monee_net.nodes:
         agent = RoleAgent()
@@ -150,7 +152,11 @@ from mango.simulation.world import create_world, discrete_step_until
 from mango.simulation.environment import DefaultEnvironment
 from mango.simulation.communication import SimpleCommunicationSimulation
 
-from mango_energy_environments import PowerSystemsBehavior, PowerUpdateInfo, ComponentRef
+from mango_energy_environments import (
+    PowerSystemsBehavior,
+    PowerUpdateInfo,
+    ComponentRef,
+)
 from mango_energy_environments.environments.scheduling import THERMAL, LOAD
 
 
@@ -173,7 +179,9 @@ async def run():
     start = datetime(2024, 1, 1)
     ts_index = pd.date_range(start, periods=24, freq="h")
     timeseries = {
-        ComponentRef(THERMAL, g0): pd.Series([8.0 + i * 0.1 for i in range(24)], index=ts_index),
+        ComponentRef(THERMAL, g0): pd.Series(
+            [8.0 + i * 0.1 for i in range(24)], index=ts_index
+        ),
     }
 
     behavior = PowerSystemsBehavior(

@@ -12,7 +12,6 @@ from mango.agent.core import State
 from mango.express.topology import Topology
 from mango.simulation.environment import Behavior, Environment
 from mango.util.clock import Clock
-
 from monee.model.child import ExtHydrGrid
 
 from mango_energy_environments.base.monee import (
@@ -220,9 +219,7 @@ class RestorationEnvironmentBehavior(Behavior):
             self._net,
             solve_time_limit_s=self._physics_solve_time_limit_s,
         )
-        self._net_results = self._accept_or_keep(
-            None, self._solve_physics(_MIN_DT_H)
-        )
+        self._net_results = self._accept_or_keep(None, self._solve_physics(_MIN_DT_H))
         self._last_energy_flow_t = clock.time
         self._last_seen_t = clock.time
 
@@ -236,9 +233,7 @@ class RestorationEnvironmentBehavior(Behavior):
 
     def _dt_h_since_last(self, now: float) -> float:
         return (
-            max(now - self._last_energy_flow_t, 0.0)
-            * self._physics_time_scale
-            / 3600.0
+            max(now - self._last_energy_flow_t, 0.0) * self._physics_time_scale / 3600.0
         )
 
     def _accept_or_keep(self, prev, candidate):
@@ -357,7 +352,8 @@ class RestorationEnvironmentBehavior(Behavior):
                 periodic_due,
             )
             self._net_results = self._accept_or_keep(
-                self._net_results, self._solve_physics(self._dt_h_since_last(clock.time))
+                self._net_results,
+                self._solve_physics(self._dt_h_since_last(clock.time)),
             )
             self._last_energy_flow_t = clock.time
             self._acts_since_solve = 0
@@ -412,9 +408,7 @@ class RestorationEnvironmentBehavior(Behavior):
             if action in ("regulate", "set_q", "set_pressure"):
                 self._acts_since_solve += 1
         else:
-            logger.warning(
-                "No action %r registered for agent %r", action, agent_id
-            )
+            logger.warning("No action %r registered for agent %r", action, agent_id)
 
     def has_action(self, agent_id: str, action: str) -> bool:
         """Return ``True`` if *agent_id* has the named *action* registered."""
@@ -511,7 +505,9 @@ class RestorationEnvironmentBehavior(Behavior):
                 # ``q_mvar`` may be a Var (ExtPowerGrid) or a plain
                 # scalar (PowerGenerator).  Setting ``.value`` works for
                 # the former; direct attribute assignment for the latter.
-                if hasattr(model.q_mvar, "value") and not isinstance(model.q_mvar, (int, float)):
+                if hasattr(model.q_mvar, "value") and not isinstance(
+                    model.q_mvar, (int, float)
+                ):
                     model.q_mvar.value = float(q_mvar_value)
                 else:
                     model.q_mvar = float(q_mvar_value)
@@ -574,7 +570,9 @@ class RestorationEnvironmentBehavior(Behavior):
         self._actions[aid] = actions
 
 
-def schedule_failure(behavior: RestorationEnvironmentBehavior, world, failure: Failure) -> None:
+def schedule_failure(
+    behavior: RestorationEnvironmentBehavior, world, failure: Failure
+) -> None:
     """Schedule *failure* on *behavior*."""
     behavior.schedule_failure(world, failure)
 
