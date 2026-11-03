@@ -12,6 +12,7 @@ from .model import (
     Network,
     connection_graph,
 )
+from .pandapower import to_pandapower
 from .prepare import add_quadratic_cost, drop_unusable_units, set_storage_defaults
 from .pypsa import from_pypsa, keep_buses, scale_to_targets
 
@@ -29,4 +30,5 @@ __all__ = [
     "from_pypsa",
     "scale_to_targets",
     "keep_buses",
+    "to_pandapower",
 ]

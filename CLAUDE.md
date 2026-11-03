@@ -16,7 +16,8 @@ Whenever new code is written here, first invoke the ponytail skill (`ponytail:po
 - **Preparation is separate from environments** (2026-11-03): `network/` converts any source
   (`from_pypsa`, later `from_pandapower`) into the common `Network` and prepares it with
   source-independent steps (`network/prepare.py`); environments only run a prepared `Network` and
-  never contain conversion or preparation code.
+  never contain conversion or preparation code. Backends that need their own data model get a
+  converter from `Network` (`network/pandapower.py`: `to_pandapower` for `PowerSystemsBehavior`).
 - Keep existing functionality (monee restoration env, pandapower scheduling env, express API) working.
 - Upstream code (Rico Schrage's) may be changed freely — Rico agreed (2026-11-03).
 - Must not contain: distributed-algorithm logic, economic-dispatch problem formulation,

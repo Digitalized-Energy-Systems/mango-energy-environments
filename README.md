@@ -22,6 +22,10 @@ source network (PyPSA, later pandapower, ...) → from_<source>() → prepare st
   `set_storage_defaults(net, max_hours, soc_initial)`.
 - PyPSA-only steps for building dataset files (`network.pypsa`): `scale_to_targets(n, {carrier: MW})`,
   `keep_buses(n, buses)` (cut out a region).
+- `to_pandapower(net)` → `(pp_net, timeseries, refs)` runs a prepared `Network` in the pandapower
+  scheduling environment: `PowerSystemsBehavior(pp_net, timeseries)`, register each agent with
+  `id=refs[component_id]`. No lines are converted (a `Network` has no impedances; the
+  environment runs no power flow); storage bounds follow pandapower's sign (positive = charging).
 
 Three environments are available:
 

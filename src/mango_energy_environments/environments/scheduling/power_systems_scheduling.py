@@ -116,6 +116,8 @@ class PowerSystemsBehavior(Behavior):
         self._actions: dict[str, dict[str, Callable]] = {}
         self._ref_to_aid: dict[ComponentRef, str] = {}
         self._ref_to_agent: dict[ComponentRef, Any] = {}
+        # renewable max_p_mw before the first replay update
+        self._nominal: dict[ComponentRef, float] = {}
 
     @property
     def net(self):
@@ -252,7 +254,10 @@ class PowerSystemsBehavior(Behavior):
     ) -> None:
         et, idx = ref
         if et == RENEWABLE:
-            nominal = getattr(self._net, et).at[idx, _COL_MAX_P_MW]
+            # nominal = max_p_mw before the first update; re-reading it would compound the factors
+            nominal = self._nominal.setdefault(
+                ref, getattr(self._net, et).at[idx, _COL_MAX_P_MW]
+            )
             getattr(self._net, et).at[idx, _COL_MAX_P_MW] = value * nominal
         else:
             getattr(self._net, et).at[idx, _COL_MAX_P_MW] = value

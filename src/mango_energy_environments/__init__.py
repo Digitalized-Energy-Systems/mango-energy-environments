@@ -90,6 +90,7 @@ from mango_energy_environments.network import (
     keep_buses,
     scale_to_targets,
     set_storage_defaults,
+    to_pandapower,
 )
 
 __all__ = [
@@ -131,6 +132,7 @@ __all__ = [
     "set_storage_defaults",
     "scale_to_targets",
     "keep_buses",
+    "to_pandapower",
     # Monee utilities
     "energyflow",
     "upper",

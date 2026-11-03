@@ -344,3 +344,65 @@ async def test_timeseries_updates_max_power(power_net_with_timeseries):
     # After 4 updates: max_p_mw should match the 4th timeseries value (index 3, t=3h)
     expected = ts[ComponentRef(THERMAL, g0)].iloc[3]
     assert net.gen.at[g0, "max_p_mw"] == pytest.approx(expected)
+
+
+async def test_runs_from_prepared_network():
+    """Network → to_pandapower → PowerSystemsBehavior; renewable replay does not compound."""
+    import numpy as np
+
+    from mango_energy_environments import Component, Network, to_pandapower
+
+    T = 3
+    flat = np.full(T, 10.0)
+    storage_params = {
+        "p_nom": 5.0,
+        "max_hours": 2.0,
+        "state_of_charge_initial": 5.0,
+        "efficiency_store": 0.9,
+        "efficiency_dispatch": 0.9,
+    }
+    demand = np.array([1.0, 2.0, 3.0])
+    net = Network(
+        time_index=pd.date_range("2024-01-01", periods=T, freq="h"),
+        components={
+            "g": Component(THERMAL, "b0", 0 * flat, flat, (20.0, 0.1), {"p_nom": 10.0}),
+            "w": Component(
+                RENEWABLE,
+                "b1",
+                0 * flat,
+                np.array([2.0, 4.0, 8.0]),
+                params={"p_nom": 8.0},
+            ),
+            "d": Component(LOAD, "b1", demand, demand),
+            "s": Component(
+                STORAGE, "b0", -0.5 * flat, 0.5 * flat, params=storage_params
+            ),
+        },
+        lines=[("b0", "b1")],
+    )
+    pp_net, timeseries, refs = to_pandapower(net)
+
+    assert len(pp_net.bus) == 2 and pp_net.line.empty
+    assert pp_net.gen.at[refs["g"][1], "max_p_mw"] == 10.0
+    st = pp_net.storage.loc[refs["s"][1]]
+    assert (st.min_p_mw, st.max_p_mw, st.max_e_mwh, st.soc_percent) == (-5, 5, 10, 50)
+    assert set(timeseries) == {refs["w"], refs["d"]}  # thermal p_max is constant
+    assert len(pp_net.poly_cost) == 3
+
+    behavior = PowerSystemsBehavior(pp_net, timeseries)
+    world = create_world(
+        start_time=0.0, environment=DefaultEnvironment(behavior=behavior)
+    )
+    monitors = {}
+    for cid in ("w", "d"):
+        agent = RoleAgent()
+        monitors[cid] = PowerLoadMonitoring()
+        agent.add_role(monitors[cid])
+        world.register(agent, suggested_aid=cid, id=refs[cid])
+
+    async with world:
+        await discrete_step_until(world, max_advance_time_s=(T - 1) * 3600.0)
+
+    assert monitors["w"].counter == monitors["d"].counter == T
+    assert pp_net.sgen.at[refs["w"][1], "max_p_mw"] == pytest.approx(8.0)
+    assert pp_net.load.at[refs["d"][1], "max_p_mw"] == pytest.approx(3.0)
