@@ -24,6 +24,8 @@ def to_pandapower(net: Network):
     ``max_p_mw``: renewables always, per unit of ``p_nom``; thermal units and loads in MW, only
     when ``p_max`` varies. Static table values are those of the first time step. Storage follows
     pandapower's sign convention (positive = charging), so its power bounds are flipped.
+    Loads: the current demand is the ``max_active_power`` observation (the replay updates
+    ``max_p_mw``); ``p_mw`` / ``active_power`` keeps the first hour's demand.
     """
     pp_net = pp.create_empty_network()
     buses = dict.fromkeys(c.bus for c in net.components.values())
