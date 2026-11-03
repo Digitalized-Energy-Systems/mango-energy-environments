@@ -1,8 +1,10 @@
 import copy
+import json
 
 import numpy as np
 import pandas as pd
 import pytest
+import xarray as xr
 
 from mango_energy_environments.network import (
     LOAD,
@@ -13,6 +15,8 @@ from mango_energy_environments.network import (
     drop_unusable_units,
     from_pypsa,
     keep_buses,
+    load_network,
+    save_network,
     scale_to_targets,
     set_storage_defaults,
 )
@@ -163,3 +167,28 @@ def test_keep_buses():
     assert n.links.empty and n.loads.empty
     assert list(n.generators.index) == ["g_in"]
     assert list(n.generators_t.p_max_pu.columns) == ["g_in"]
+
+
+def test_save_load_roundtrip(tmp_path, net):
+    prepare(net)
+    net.lines = [("b", "b")]
+    path = tmp_path / "net.nc"
+    save_network(net, path, meta={"k": 0.11})
+    back = load_network(path)
+
+    assert back.time_index.equals(net.time_index)
+    assert back.lines == net.lines
+    assert list(back.components) == list(net.components)
+    for cid, c in net.components.items():
+        b = back.components[cid]
+        assert (b.kind, b.bus, b.cost, b.params) == (c.kind, c.bus, c.cost, c.params)
+        np.testing.assert_array_equal(b.p_min, c.p_min)
+        np.testing.assert_array_equal(b.p_max, c.p_max)
+    with xr.open_dataset(path) as ds:
+        assert json.loads(ds.attrs["meta"]) == {"k": 0.11}
+
+
+def test_load_rejects_other_nc(tmp_path):
+    xr.Dataset({"x": ("i", [1.0])}).to_netcdf(tmp_path / "other.nc")
+    with pytest.raises(ValueError, match="not a saved Network"):
+        load_network(tmp_path / "other.nc")

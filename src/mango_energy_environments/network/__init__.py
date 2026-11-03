@@ -3,6 +3,7 @@
 Every environment runs from the prepared :class:`Network`, whatever source it came from.
 """
 
+from .io import load_network, save_network
 from .model import (
     LOAD,
     RENEWABLE,
@@ -31,4 +32,6 @@ __all__ = [
     "scale_to_targets",
     "keep_buses",
     "to_pandapower",
+    "save_network",
+    "load_network",
 ]

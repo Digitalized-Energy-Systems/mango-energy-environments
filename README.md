@@ -22,6 +22,9 @@ source network (PyPSA, later pandapower, ...) → from_<source>() → prepare st
   `set_storage_defaults(net, max_hours, soc_initial)`.
 - PyPSA-only steps for building dataset files (`network.pypsa`): `scale_to_targets(n, {carrier: MW})`,
   `keep_buses(n, buses)` (cut out a region).
+- `save_network(net, path, meta)` / `load_network(path)`: a prepared `Network` as NetCDF (`.nc`;
+  arrays zlib-compressed, per-component params as JSON, `meta` e.g. the recipe as JSON attribute),
+  so a network is prepared once and reused by every run.
 - `to_pandapower(net)` → `(pp_net, timeseries, refs)` runs a prepared `Network` in the pandapower
   scheduling environment: `PowerSystemsBehavior(pp_net, timeseries)`, register each agent with
   `id=refs[component_id]`. No lines are converted (a `Network` has no impedances; the
