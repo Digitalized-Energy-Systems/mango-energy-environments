@@ -5,16 +5,14 @@ from mango import RoleAgent
 from mango.simulation.environment import DefaultEnvironment
 from mango.simulation.world import create_world
 
-from mango_energy_environments.environments.copper_plate import (
-    Component,
-    CopperPlateBehavior,
-    CopperPlateNetwork,
-    connection_graph,
-)
-from mango_energy_environments.environments.scheduling import (
+from mango_energy_environments.environments.copper_plate import CopperPlateBehavior
+from mango_energy_environments.network import (
     LOAD,
     RENEWABLE,
     THERMAL,
+    Component,
+    Network,
+    connection_graph,
 )
 
 T = 3
@@ -26,7 +24,7 @@ def flat(v):
 
 @pytest.fixture
 def network():
-    return CopperPlateNetwork(
+    return Network(
         time_index=pd.date_range("2024-01-01", periods=T, freq="h"),
         components={
             "g0": Component(THERMAL, "b0", flat(0), flat(10), cost=(20.0, 0.1)),
@@ -69,71 +67,3 @@ async def test_observe_act_balance_in_world(network):
         behavior.act(gen.aid, "set_schedule", [1.0])
     with pytest.raises(KeyError):
         world.register(RoleAgent(), suggested_aid="bad", id="nope")
-
-
-def test_from_pypsa(caplog):
-    pypsa = pytest.importorskip("pypsa")
-    from mango_energy_environments.environments.copper_plate import from_pypsa
-    from mango_energy_environments.environments.scheduling import STORAGE
-
-    n = pypsa.Network()
-    n.set_snapshots(pd.date_range("2024-01-01", periods=T, freq="h"))
-    for b in ("b0", "b1", "b2"):
-        n.add("Bus", b)
-    n.add("Line", "l01", bus0="b0", bus1="b1", x=0.1, s_nom=100)
-    n.add("Link", "k12", bus0="b1", bus1="b2", p_nom=50)
-    n.add(
-        "Generator",
-        "coal",
-        bus="b0",
-        p_nom=10,
-        marginal_cost=20,
-        marginal_cost_quadratic=0.1,
-    )
-    n.add("Generator", "bio", bus="b0", p_nom=4, marginal_cost=15, carrier="biomass")
-    n.add(
-        "Generator", "pv", bus="b1", p_nom=5, p_max_pu=[0.0, 0.5, 1.0], carrier="solar"
-    )
-    n.add("Load", "d", bus="b1", p_set=[1.0, 2.0, 3.0])
-    n.add("StorageUnit", "bat", bus="b2", p_nom=2, max_hours=2, p_min_pu=-1)
-    n.add("Store", "tank", bus="b2")
-
-    cp = from_pypsa(n)
-
-    kinds = {cid: c.kind for cid, c in cp.components.items()}
-    assert kinds == {
-        "coal": THERMAL,
-        "bio": THERMAL,
-        "pv": RENEWABLE,
-        "d": LOAD,
-        "bat": STORAGE,
-    }
-    np.testing.assert_array_equal(cp.components["pv"].p_max, [0.0, 2.5, 5.0])
-    np.testing.assert_array_equal(cp.components["coal"].p_max, flat(10))
-    np.testing.assert_array_equal(cp.components["d"].p_max, [1.0, 2.0, 3.0])
-    np.testing.assert_array_equal(cp.components["bat"].p_min, flat(-2))
-    assert cp.components["coal"].cost == (20.0, 0.1)
-    assert cp.components["bat"].params["max_hours"] == 2.0
-    assert cp.components["bat"].params["p_nom"] == 2.0
-    assert cp.lines == [("b0", "b1"), ("b1", "b2")]
-    assert len(cp.time_index) == T
-    assert "1 Store ignored" in caplog.text
-
-
-def test_from_pypsa_drops_buses_without_components(caplog):
-    pypsa = pytest.importorskip("pypsa")
-    from mango_energy_environments.environments.copper_plate import from_pypsa
-
-    n = pypsa.Network()
-    n.set_snapshots(pd.date_range("2024-01-01", periods=T, freq="h"))
-    for b in ("b0", "b1", "b2"):
-        n.add("Bus", b)
-    n.add("Line", "l01", bus0="b0", bus1="b1", x=0.1, s_nom=100)
-    n.add("Line", "l12", bus0="b1", bus1="b2", x=0.1, s_nom=100)
-    n.add("Generator", "g", bus="b0", p_nom=10)
-    n.add("Load", "d", bus="b2", p_set=1.0)
-
-    cp = from_pypsa(n)
-
-    assert cp.lines == []
-    assert "1 buses without components dropped: ['b1']" in caplog.text

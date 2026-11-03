@@ -3,7 +3,15 @@
 
 Energy system simulation environments for **mango-agents**.
 
-Two environments are provided:
+**Networks** – :mod:`~mango_energy_environments.network`
+    Environment-independent: a source network (PyPSA, ...) is converted
+    (``from_pypsa``) and prepared (``drop_unusable_units``, ``add_quadratic_cost``,
+    ``set_storage_defaults``) into a :class:`Network` that environments run from.
+
+Environments:
+
+**Copper plate** – :mod:`~mango_energy_environments.environments.copper_plate`
+    Runs a prepared :class:`Network` without physics (pool balance per time step).
 
 **Restoration** – :mod:`~mango_energy_environments.environments.restoration`
     Integrates a *monee* multi-energy network into a mango
@@ -12,7 +20,7 @@ Two environments are provided:
 
 **Scheduling** – :mod:`~mango_energy_environments.environments.scheduling`
     Integrates a *pandapower* power network into mango.  Replays timeseries
-    data on the simulation clock and offers copper-plate economic dispatch.
+    data on the simulation clock.
 
 Quick start::
 
@@ -37,13 +45,7 @@ from mango_energy_environments.base.monee import (
     solve_load_shedding_optimization_relaxed,
     upper,
 )
-from mango_energy_environments.environments.copper_plate import (
-    Component,
-    CopperPlateBehavior,
-    CopperPlateNetwork,
-    connection_graph,
-    from_pypsa,
-)
+from mango_energy_environments.environments.copper_plate import CopperPlateBehavior
 from mango_energy_environments.environments.restoration import (
     BranchFailureEvent,
     CustomFailureEvent,
@@ -74,9 +76,17 @@ from mango_energy_environments.express import (
     create_small_benchmark_restoration_world,
     enable_poisson_com_for_monee,
 )
-from mango_energy_environments.pypsa_preparation import (
+from mango_energy_environments.network import (
+    LOAD,
+    RENEWABLE,
+    STORAGE,
+    THERMAL,
+    Component,
+    Network,
     add_quadratic_cost,
+    connection_graph,
     drop_unusable_units,
+    from_pypsa,
     keep_buses,
     scale_to_targets,
     set_storage_defaults,
@@ -102,21 +112,25 @@ __all__ = [
     "PowerUpdateInfo",
     "ComponentRef",
     "PowerSystemsBehavior",
+    "calculate_initial_time",
+    "get_possible_components",
+    "get_components_by_type",
     # Copper plate
-    "Component",
-    "CopperPlateNetwork",
     "CopperPlateBehavior",
+    # Networks (source → from_<source> → prepare → Network)
+    "THERMAL",
+    "RENEWABLE",
+    "LOAD",
+    "STORAGE",
+    "Component",
+    "Network",
     "connection_graph",
     "from_pypsa",
-    # PyPSA preparation
     "drop_unusable_units",
     "add_quadratic_cost",
     "set_storage_defaults",
     "scale_to_targets",
     "keep_buses",
-    "calculate_initial_time",
-    "get_possible_components",
-    "get_components_by_type",
     # Monee utilities
     "energyflow",
     "upper",

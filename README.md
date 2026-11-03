@@ -7,20 +7,30 @@
 
 Energy system simulation environments for [mango-agents](https://github.com/OFFIS-DAI/mango), the Python multi-agent systems framework.
 
+**Networks** (`mango_energy_environments.network`) are prepared independently of any environment:
+
+```
+source network (PyPSA, later pandapower, ...) → from_<source>() → prepare steps → Network → any environment
+```
+
+- `Network` = time index + `Component`s (kind, bus, `p_min`/`p_max` arrays, cost c₁/c₂, `params`)
+  + lines (bus pairs); `connection_graph(net)` gives the component graph (→ mango `graph_topology`).
+- `from_pypsa(pypsa.Network(path))` converts a PyPSA network (install extra `[pypsa]`):
+  renewable = generator with an hourly `p_max_pu` profile; lines and links both connect agents.
+- Source-independent preparation on the `Network` (`network.prepare`): `drop_unusable_units`,
+  `add_quadratic_cost(net, k)` (c₂ = k·c₁/p_nom on thermal units),
+  `set_storage_defaults(net, max_hours, soc_initial)`.
+- PyPSA-only steps for building dataset files (`network.pypsa`): `scale_to_targets(n, {carrier: MW})`,
+  `keep_buses(n, buses)` (cut out a region).
+
 Three environments are available:
 
 - **Multi-energy restoration** — based on [`monee`](https://pypi.org/project/monee/)
 - **Power systems scheduling** — based on [`pandapower`](https://pandapower.readthedocs.io/)
-- **Copper plate** — no physics: energy moves freely between all components (one balance pool per
-  time step); lines only decide which agents are connected (`connection_graph` → mango
-  `graph_topology`). Agents observe whole-horizon arrays (`statics`, `p_min`, `p_max`/`demand`) and
-  act with `set_schedule`; `CopperPlateBehavior.balance()` gives the residual per step.
-  `from_pypsa(pypsa.Network(path))` converts a PyPSA network file (install extra `[pypsa]`):
-  renewable = generator with an hourly `p_max_pu` profile; lines and links both connect agents.
-  Preparation steps on the PyPSA network before converting (`pypsa_preparation`):
-  `drop_unusable_units`, `add_quadratic_cost(n, k)` (c₂ = k·c₁/p_nom on thermal units),
-  `set_storage_defaults(n, max_hours, soc_initial)`, `scale_to_targets(n, {carrier: MW})`,
-  `keep_buses(n, buses)` (cut out a region).
+- **Copper plate** — runs a prepared `Network` without physics: energy moves freely between all
+  components (one balance pool per time step); lines only decide which agents are connected.
+  Agents observe whole-horizon arrays (`statics`, `p_min`, `p_max`/`demand`) and act with
+  `set_schedule`; `CopperPlateBehavior.balance()` gives the residual per step.
 
 ---
 

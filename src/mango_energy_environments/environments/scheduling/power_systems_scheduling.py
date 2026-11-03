@@ -15,6 +15,8 @@ import pandas as pd
 from mango.simulation.environment import Behavior, Environment
 from mango.util.clock import Clock
 
+from ...network.model import LOAD, RENEWABLE, STORAGE, THERMAL
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -24,15 +26,6 @@ __all__ = [
     "get_possible_components",
     "get_components_by_type",
 ]
-
-#: Synchronous / thermal generator.
-THERMAL = "gen"
-#: Static / renewable generator (wind, solar, run-of-river).
-RENEWABLE = "sgen"
-#: Demand / load.
-LOAD = "load"
-#: Energy storage / battery.
-STORAGE = "storage"
 
 _COL_P_MW = "p_mw"
 _COL_MAX_P_MW = "max_p_mw"

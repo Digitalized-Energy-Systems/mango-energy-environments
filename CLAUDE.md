@@ -13,7 +13,12 @@ Whenever new code is written here, first invoke the ponytail skill (`ponytail:po
   benchmark's main mode). Also: component classification, time series, observe/act, component
   agents bound to network elements, network sources converted into backend networks (e.g.
   PyPSA → pandapower), generic preparation steps (cost model, slack detection, profiles).
+- **Preparation is separate from environments** (2026-11-03): `network/` converts any source
+  (`from_pypsa`, later `from_pandapower`) into the common `Network` and prepares it with
+  source-independent steps (`network/prepare.py`); environments only run a prepared `Network` and
+  never contain conversion or preparation code.
 - Keep existing functionality (monee restoration env, pandapower scheduling env, express API) working.
+- Upstream code (Rico Schrage's) may be changed freely — Rico agreed (2026-11-03).
 - Must not contain: distributed-algorithm logic, economic-dispatch problem formulation,
   central-dispatch solver, benchmark datasets/runs. Never import distributed_resource_optimization.
 
