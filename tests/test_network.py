@@ -133,6 +133,20 @@ def test_linear_cost_model(net):
     assert all(c.cost[1] == 0 for c in net.components.values())
 
 
+def test_curvature_band(net):
+    prepare(net)
+    c = net.components
+    # a free thermal unit (e.g. geothermal) gets the band too
+    c["coal"].cost = (0.0, 0.0)
+    add_quadratic_cost(net, k=0.11, band=1.0)
+    # full output reached at c₁ + band: c₂ = band / (2·p_nom)
+    assert c["pv"].cost == (0.01, pytest.approx(1.0 / 100))
+    assert c["bat"].cost[1] == pytest.approx(1.0 / 8)
+    assert c["coal"].cost == (0.0, pytest.approx(1.0 / 200))
+    add_quadratic_cost(net, k=0.0, band=0.0)  # back to the linear model
+    assert all(x.cost[1] == 0 for x in c.values())
+
+
 def test_scale_to_targets():
     n = pypsa.Network()
     n.add("Bus", "b")
