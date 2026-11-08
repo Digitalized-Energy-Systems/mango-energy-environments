@@ -85,6 +85,8 @@ pip install -e .
 ```
 
 **Requirements:** Python ≥ 3.11, `mango-agents`, `monee`, `pandapower`, `networkx`, `pandas`, `numpy`.
+The restoration environment solves with **Gurobi** (`base/monee.py`, solver fixed) and needs a
+Gurobi installation + license; the copper-plate and pandapower environments do not.
 
 ---
 
