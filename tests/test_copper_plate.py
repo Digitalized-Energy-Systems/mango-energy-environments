@@ -67,3 +67,25 @@ async def test_observe_act_balance_in_world(network):
         behavior.act(gen.aid, "set_schedule", [1.0])
     with pytest.raises(KeyError):
         world.register(RoleAgent(), suggested_aid="bad", id="nope")
+
+
+async def test_bus_agent(network):
+    behavior = CopperPlateBehavior(network)
+    world = create_world(
+        start_time=0.0, environment=DefaultEnvironment(behavior=behavior)
+    )
+    bus = world.register(RoleAgent(), suggested_aid="b0", bus="b0")
+
+    assert behavior.observe(bus.aid, "components") == ["g0", "l0"]
+    np.testing.assert_array_equal(
+        behavior.observe(bus.aid, "demand", "l0"), [4.0, 6.0, 8.0]
+    )
+    behavior.act(bus.aid, "set_schedule", [4.0, 6.0, 8.0], "g0")
+    np.testing.assert_array_equal(behavior.balance(), [0.0, 0.0, 0.0])
+
+    with pytest.raises(ValueError):  # several components: cid required
+        behavior.observe(bus.aid, "p_max")
+    with pytest.raises(KeyError):  # not at this bus
+        behavior.act(bus.aid, "set_schedule", flat(1), "g2")
+    with pytest.raises(KeyError):
+        world.register(RoleAgent(), suggested_aid="bad", bus="nope")

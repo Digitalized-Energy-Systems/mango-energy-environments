@@ -37,7 +37,10 @@ Three environments are available:
 - **Copper plate** — runs a prepared `Network` without physics: energy moves freely between all
   components (one balance pool per time step); lines only decide which agents are connected.
   Agents observe whole-horizon arrays (`statics`, `p_min`, `p_max`/`demand`) and act with
-  `set_schedule`; `CopperPlateBehavior.balance()` gives the residual per step.
+  `set_schedule`; `CopperPlateBehavior.balance()` gives the residual per step. An agent is bound
+  to one component (`register(..., id=cid)`) or to all components at a bus (`bus=b`); a bus
+  agent passes the component id (`observe(aid, name, cid)`, `act(aid, "set_schedule", s, cid)`)
+  and lists its own with `observe(aid, "components")`.
 
 ---
 
