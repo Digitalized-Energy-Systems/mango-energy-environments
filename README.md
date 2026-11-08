@@ -18,7 +18,8 @@ source network (PyPSA, later pandapower, ...) → from_<source>() → prepare st
 - `from_pypsa(pypsa.Network(path))` converts a PyPSA network (install extra `[pypsa]`):
   renewable = generator with an hourly `p_max_pu` profile; lines and links both connect agents.
 - Source-independent preparation on the `Network` (`network.prepare`): `drop_unusable_units`,
-  `add_quadratic_cost(net, k)` (c₂ = k·c₁/p_nom on thermal units),
+  `add_quadratic_cost(net, k, band)` (c₂ = k·c₁/p_nom on thermal units with c₁ > 0; renewables,
+  storage and free thermal units get c₂ = band/(2·p_nom); `k = band = 0` = linear),
   `set_storage_defaults(net, max_hours, soc_initial)`.
 - PyPSA-only steps for building dataset files (`network.pypsa`): `scale_to_targets(n, {carrier: MW})`,
   `keep_buses(n, buses)` (cut out a region).
@@ -58,14 +59,14 @@ This package is one of three with separate responsibilities:
   two modes: **physical** (runs on the real frameworks — pandapower, monee — incl. their physical
   calculations) and **copper-plate** (physics skipped; lines only decide which agents are connected,
   energy moves freely between any actors; used by the benchmark). Networks, components, time series,
-  observe/act, component agents, network sources (e.g. PyPSA) converted into backend networks,
+  observe/act, binding agents to network elements (one component or a whole bus), network sources (e.g. PyPSA) converted into backend networks,
   generic preparation steps. Existing functionality (monee restoration, pandapower scheduling) is
   kept. No distributed-algorithm or benchmark logic.
 - **distributed-resource-optimization** — only the logic of the distributed algorithms, as generic
   as possible (usable for non-energy problems too) and built on mango as far as possible, including
   the generic mango carrier/role. No PyPSA, network or benchmark logic.
 - **energy-scheduling-benchmark** — builds the benchmark from the other two: the economic-dispatch
-  problem formulation, storage model, central-dispatch optimum, benchmark roles (leader, loads),
+  problem formulation, storage model, central-dispatch optimum, benchmark roles (leader, bus agents),
   concrete datasets, runs and comparisons.
 
 Dependencies point one way only: energy-scheduling-benchmark → the other two; mango-energy-environments

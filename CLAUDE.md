@@ -10,8 +10,8 @@ Whenever new code is written here, first invoke the ponytail skill (`ponytail:po
 - Owns: energy-network representation and simulation in two modes — **physical** (real backend
   frameworks: pandapower, monee, with their physical calculations) and **copper-plate** (no physics;
   lines only define which agents are connected; energy moves freely between any actors; the
-  benchmark's main mode). Also: component classification, time series, observe/act, component
-  agents bound to network elements, network sources converted into backend networks (e.g.
+  benchmark's main mode). Also: component classification, time series, observe/act, binding
+  agents to network elements (one component or a whole bus), network sources converted into backend networks (e.g.
   PyPSA → pandapower), generic preparation steps (cost model, slack detection, profiles).
 - **Preparation is separate from environments** (2026-11-03): `network/` converts any source
   (`from_pypsa`, later `from_pandapower`) into the common `Network` and prepares it with
