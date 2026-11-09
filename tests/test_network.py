@@ -224,7 +224,7 @@ def test_from_pandapower(caplog):
     pp.create_poly_cost(n, g, "gen", cp1_eur_per_mw=27.3)
     pp.create_sgen(n, b[2], 10.0, name="wind", type="wind onshore")
     pp.create_load(n, b[3], 80.0, name="load")
-    pp.create_load(n, b[1], 5.0, name="static")
+    pp.create_load(n, b[1], 10.0, name="static", scaling=0.5)
     pp.create_ext_grid(n, b[4])
     idx = pd.date_range("2016-01-01", periods=T, freq="h")
     profiles = {
@@ -245,7 +245,7 @@ def test_from_pandapower(caplog):
     assert c["coal"].p_max.tolist() == [300.0] * T
     assert c["wind"].kind == RENEWABLE and c["wind"].p_max.tolist() == [0.0, 5.0, 10.0]
     assert c["load"].kind == LOAD and c["load"].p_max.tolist() == [70.0, 80.0, 90.0]
-    assert c["static"].p_max.tolist() == [5.0] * T  # no profile column: static p_mw
+    assert c["static"].p_max.tolist() == [5.0] * T  # no profile column: p_mw × scaling
     assert sorted(net.lines) == [
         ("0", "1"),
         ("1", "2"),
@@ -253,3 +253,6 @@ def test_from_pandapower(caplog):
     ]  # switch, trafo, line
     assert "1 ext_grid ignored" in caplog.text
     assert "buses without components dropped: ['4']" in caplog.text
+    profiles["sgen"].iloc[1, 0] = np.nan
+    with pytest.raises(ValueError, match="NaN"):
+        from_pandapower(n, profiles)

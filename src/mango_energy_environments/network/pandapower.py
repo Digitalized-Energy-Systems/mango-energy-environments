@@ -33,7 +33,7 @@ def from_pandapower(pp_net, profiles: dict[str, pd.DataFrame]) -> Network:
     """Convert a pandapower net into a :class:`Network` (full horizon; cut by the caller).
 
     *profiles*: absolute active power per element table (``"load"``, ``"sgen"``), MW, time ×
-    element index; elements without a column keep their static ``p_mw``. Time index = the
+    element index; elements without a column keep their static ``p_mw`` × ``scaling``. Time index = the
     profiles' index. Only in-service elements; component id = element name (must be unique),
     bus id = pandapower bus index as str.
 
@@ -46,6 +46,9 @@ def from_pandapower(pp_net, profiles: dict[str, pd.DataFrame]) -> Network:
     for table in sorted(_PP_IGNORED):
         if table in pp_net and len(pp_net[table]):
             logger.warning("from_pandapower: %d %s ignored", len(pp_net[table]), table)
+    if any(df.isna().any().any() for df in profiles.values()):
+        # a NaN size would make prepare drop the unit silently
+        raise ValueError("from_pandapower: profiles contain NaN")
     time_index = next(iter(profiles.values())).index
     cost = {
         (r.et, r.element): (float(r.cp1_eur_per_mw), float(r.cp2_eur_per_mw2))
@@ -65,7 +68,8 @@ def from_pandapower(pp_net, profiles: dict[str, pd.DataFrame]) -> Network:
         prof = profiles.get(table)
         if prof is not None and idx in prof.columns:
             return prof[idx].to_numpy(dtype=float)
-        return np.full(len(time_index), float(pp_net[table].at[idx, "p_mw"]))
+        row = pp_net[table].loc[idx]
+        return np.full(len(time_index), float(row.p_mw * row.scaling))
 
     zero = np.zeros(len(time_index))
     for idx, g in pp_net.gen[pp_net.gen.in_service].iterrows():
