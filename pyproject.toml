@@ -18,6 +18,7 @@ dependencies = [
     "numpy>=1.24",
     "xarray>=2023.1",
     "netCDF4>=1.6",
+    "simbench>=1.6",
 ]
 
 [project.optional-dependencies]

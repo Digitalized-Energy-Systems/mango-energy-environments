@@ -13,6 +13,7 @@ from mango_energy_environments.network import (
     THERMAL,
     add_quadratic_cost,
     drop_unusable_units,
+    from_pandapower,
     from_pypsa,
     keep_buses,
     load_network,
@@ -206,3 +207,49 @@ def test_load_rejects_other_nc(tmp_path):
     xr.Dataset({"x": ("i", [1.0])}).to_netcdf(tmp_path / "other.nc")
     with pytest.raises(ValueError, match="not a saved Network"):
         load_network(tmp_path / "other.nc")
+
+
+def test_from_pandapower(caplog):
+    import pandapower as pp
+
+    n = pp.create_empty_network()
+    b = [pp.create_bus(n, 380.0) for _ in range(5)]
+    pp.create_switch(n, b[0], b[1], et="b", closed=True)  # busbar coupler
+    pp.create_switch(n, b[1], b[4], et="b", closed=False)  # open: no connection
+    pp.create_transformer(n, b[1], b[2], "160 MVA 380/110 kV")
+    pp.create_line(n, b[2], b[3], 1.0, "490-AL1/64-ST1A 380.0")
+    g = pp.create_gen(
+        n, b[0], 200.0, max_p_mw=300.0, min_p_mw=50.0, name="coal", type="hard coal"
+    )
+    pp.create_poly_cost(n, g, "gen", cp1_eur_per_mw=27.3)
+    pp.create_sgen(n, b[2], 10.0, name="wind", type="wind onshore")
+    pp.create_load(n, b[3], 80.0, name="load")
+    pp.create_load(n, b[1], 5.0, name="static")
+    pp.create_ext_grid(n, b[4])
+    idx = pd.date_range("2016-01-01", periods=T, freq="h")
+    profiles = {
+        "load": pd.DataFrame({0: [70.0, 80.0, 90.0]}, index=idx),
+        "sgen": pd.DataFrame({0: [0.0, 5.0, 10.0]}, index=idx),
+    }
+    net = from_pandapower(n, profiles)
+    c = net.components
+    assert net.time_index.equals(idx)
+    assert (c["coal"].kind, c["coal"].bus, c["coal"].cost) == (
+        THERMAL,
+        "0",
+        (27.3, 0.0),
+    )
+    assert (
+        c["coal"].p_min.tolist() == [0.0] * T
+    )  # min_p_mw ignored (no unit commitment)
+    assert c["coal"].p_max.tolist() == [300.0] * T
+    assert c["wind"].kind == RENEWABLE and c["wind"].p_max.tolist() == [0.0, 5.0, 10.0]
+    assert c["load"].kind == LOAD and c["load"].p_max.tolist() == [70.0, 80.0, 90.0]
+    assert c["static"].p_max.tolist() == [5.0] * T  # no profile column: static p_mw
+    assert sorted(net.lines) == [
+        ("0", "1"),
+        ("1", "2"),
+        ("2", "3"),
+    ]  # switch, trafo, line
+    assert "1 ext_grid ignored" in caplog.text
+    assert "buses without components dropped: ['4']" in caplog.text

@@ -13,9 +13,10 @@ from .model import (
     Network,
     connection_graph,
 )
-from .pandapower import to_pandapower
+from .pandapower import from_pandapower, to_pandapower
 from .prepare import add_quadratic_cost, drop_unusable_units, set_storage_defaults
 from .pypsa import from_pypsa, keep_buses, scale_to_targets
+from .simbench import load_simbench
 
 __all__ = [
     "THERMAL",
@@ -31,6 +32,8 @@ __all__ = [
     "from_pypsa",
     "scale_to_targets",
     "keep_buses",
+    "from_pandapower",
+    "load_simbench",
     "to_pandapower",
     "save_network",
     "load_network",
