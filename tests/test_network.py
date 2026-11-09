@@ -73,7 +73,7 @@ def test_from_pypsa(caplog):
     assert "1 Store ignored" in caplog.text
 
 
-def test_from_pypsa_drops_buses_without_components(caplog):
+def test_from_pypsa_drops_and_bridges_buses_without_components(caplog):
     n = pypsa.Network()
     n.set_snapshots(pd.date_range("2024-01-01", periods=T, freq="h"))
     for b in ("b0", "b1", "b2"):
@@ -85,8 +85,17 @@ def test_from_pypsa_drops_buses_without_components(caplog):
 
     cp = from_pypsa(n)
 
-    assert cp.lines == []
+    assert cp.lines == [("b0", "b2")]  # bridged through the dropped b1
     assert "1 buses without components dropped: ['b1']" in caplog.text
+
+
+def test_bridge_lines():
+    from mango_energy_environments.network.model import bridge_lines
+
+    # a - x - y - b, x - c, d - e: x, y unused → a, b, c all reach each other
+    pairs = [("a", "x"), ("x", "y"), ("y", "b"), ("x", "c"), ("d", "e"), ("a", "d")]
+    lines = bridge_lines(pairs, {"a", "b", "c", "d", "e"})
+    assert lines == [("d", "e"), ("a", "d"), ("a", "b"), ("a", "c"), ("b", "c")]
 
 
 @pytest.fixture

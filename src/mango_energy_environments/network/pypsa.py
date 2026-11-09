@@ -11,7 +11,7 @@ import re
 
 import numpy as np
 
-from .model import LOAD, RENEWABLE, STORAGE, THERMAL, Component, Network
+from .model import LOAD, RENEWABLE, STORAGE, THERMAL, Component, Network, bridge_lines
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ def from_pypsa(n) -> Network:
 
     Renewable = generator with an hourly ``p_max_pu`` profile, else thermal. Lines and links both
     count as connections. Storage data goes into ``params`` as-is. Buses without components are
-    dropped with their lines (a warning names them), so they do not connect their neighbours.
+    dropped (a warning names them); lines through them are bridged (``bridge_lines``).
     """
     # shortcut: static marginal cost only and single-period snapshots; extend when a network needs it.
     for c in n.components:
@@ -92,11 +92,9 @@ def from_pypsa(n) -> Network:
         logger.warning(
             "from_pypsa: %d buses without components dropped: %s", len(empty), empty
         )
-    lines = [
-        (a, b)
-        for a, b in [*zip(n.lines.bus0, n.lines.bus1), *zip(n.links.bus0, n.links.bus1)]
-        if a in used and b in used
-    ]
+    lines = bridge_lines(
+        [*zip(n.lines.bus0, n.lines.bus1), *zip(n.links.bus0, n.links.bus1)], used
+    )
     return Network(n.snapshots, components, lines)
 
 

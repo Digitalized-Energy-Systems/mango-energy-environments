@@ -16,7 +16,7 @@ import numpy as np
 import pandapower as pp
 import pandas as pd
 
-from .model import LOAD, RENEWABLE, STORAGE, THERMAL, Component, Network
+from .model import LOAD, RENEWABLE, STORAGE, THERMAL, Component, Network, bridge_lines
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ def from_pandapower(pp_net, profiles: dict[str, pd.DataFrame]) -> Network:
       commitment); sgen → renewable, 0 … profile; load → demand profile.
     - cost (c₁, c₂) from ``poly_cost`` (``cp1_eur_per_mw``, ``cp2_eur_per_mw2``), else 0.
     - connections: lines, trafos and closed bus–bus switches. Buses without components are
-      dropped with their connections (as in ``from_pypsa``).
+      dropped; connections through them are bridged (``bridge_lines``, as in ``from_pypsa``).
     """
     for table in sorted(_PP_IGNORED):
         if table in pp_net and len(pp_net[table]):
@@ -116,11 +116,7 @@ def from_pandapower(pp_net, profiles: dict[str, pd.DataFrame]) -> Network:
         ),
         *zip(sw.bus, sw.element),
     ]
-    lines = [
-        (str(a), str(b))
-        for a, b in pairs
-        if a != b and str(a) in used and str(b) in used
-    ]
+    lines = bridge_lines([(str(a), str(b)) for a, b in pairs if a != b], used)
     return Network(time_index, components, lines)
 
 

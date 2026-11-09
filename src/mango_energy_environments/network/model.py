@@ -56,6 +56,20 @@ class Network:
     lines: list[tuple[str, str]]  # bus pairs joined by an AC line or link
 
 
+def bridge_lines(pairs, used) -> list[tuple[str, str]]:
+    """Lines among the *used* buses (those with components). A path through unused buses (dropped
+    by the converters) becomes direct lines between the used buses at its ends, so dropping a
+    transit substation does not split the grid."""
+    graph = nx.Graph(pairs)
+    lines = [(a, b) for a, b in pairs if a in used and b in used]
+    bridged = set()
+    unused = graph.subgraph(n for n in graph if n not in used)
+    for part in nx.connected_components(unused):
+        ends = sorted({m for n in part for m in graph[n] if m in used})
+        bridged.update(combinations(ends, 2))
+    return lines + sorted(bridged)
+
+
 def connection_graph(network: Network) -> nx.Graph:
     """Component graph: same bus → connected; buses joined by a line → all-to-all."""
     by_bus: dict[str, list[str]] = defaultdict(list)
