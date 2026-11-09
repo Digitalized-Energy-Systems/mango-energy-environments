@@ -227,6 +227,8 @@ def test_from_pandapower(caplog):
     pp.create_switch(n, b[1], b[4], et="b", closed=False)  # open: no connection
     pp.create_transformer(n, b[1], b[2], "160 MVA 380/110 kV")
     pp.create_line(n, b[2], b[3], 1.0, "490-AL1/64-ST1A 380.0")
+    cut = pp.create_line(n, b[0], b[3], 1.0, "490-AL1/64-ST1A 380.0")
+    pp.create_switch(n, b[0], cut, et="l", closed=False)  # open: line does not connect
     g = pp.create_gen(
         n, b[0], 200.0, max_p_mw=300.0, min_p_mw=50.0, name="coal", type="hard coal"
     )

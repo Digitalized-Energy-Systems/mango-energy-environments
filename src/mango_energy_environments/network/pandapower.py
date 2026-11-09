@@ -40,7 +40,7 @@ def from_pandapower(pp_net, profiles: dict[str, pd.DataFrame]) -> Network:
     - gen → thermal, 0 … ``max_p_mw`` (``min_p_mw`` and gen profiles ignored: no unit
       commitment); sgen → renewable, 0 … profile; load → demand profile.
     - cost (c₁, c₂) from ``poly_cost`` (``cp1_eur_per_mw``, ``cp2_eur_per_mw2``), else 0.
-    - connections: lines, trafos and closed bus–bus switches. Buses without components are
+    - connections: lines and trafos (unless an open switch cuts them) and closed bus–bus switches. Buses without components are
       dropped; connections through them are bridged (``bridge_lines``, as in ``from_pypsa``).
     """
     for table in sorted(_PP_IGNORED):
@@ -105,15 +105,16 @@ def from_pandapower(pp_net, profiles: dict[str, pd.DataFrame]) -> Network:
             empty,
         )
     sw = pp_net.switch[(pp_net.switch.et == "b") & pp_net.switch.closed]
+    opened = pp_net.switch[
+        ~pp_net.switch.closed
+    ]  # an open line/trafo switch cuts the branch
+    line = pp_net.line[pp_net.line.in_service]
+    line = line[~line.index.isin(opened.element[opened.et == "l"])]
+    trafo = pp_net.trafo[pp_net.trafo.in_service]
+    trafo = trafo[~trafo.index.isin(opened.element[opened.et == "t"])]
     pairs = [
-        *zip(
-            pp_net.line.from_bus[pp_net.line.in_service],
-            pp_net.line.to_bus[pp_net.line.in_service],
-        ),
-        *zip(
-            pp_net.trafo.hv_bus[pp_net.trafo.in_service],
-            pp_net.trafo.lv_bus[pp_net.trafo.in_service],
-        ),
+        *zip(line.from_bus, line.to_bus),
+        *zip(trafo.hv_bus, trafo.lv_bus),
         *zip(sw.bus, sw.element),
     ]
     lines = bridge_lines([(str(a), str(b)) for a, b in pairs if a != b], used)
