@@ -10,13 +10,20 @@ Energy system simulation environments for [mango-agents](https://github.com/OFFI
 **Networks** (`mango_energy_environments.network`) are prepared independently of any environment:
 
 ```
-source network (PyPSA, later pandapower, ...) → from_<source>() → prepare steps → Network → any environment
+source network (PyPSA, pandapower/SimBench, ...) → from_<source>() → prepare steps → Network → any environment
 ```
 
 - `Network` = time index + `Component`s (kind, bus, `p_min`/`p_max` arrays, cost c₁/c₂, `params`)
   + lines (bus pairs); `connection_graph(net)` gives the component graph (→ mango `graph_topology`).
 - `from_pypsa(pypsa.Network(path))` converts a PyPSA network (install extra `[pypsa]`):
   renewable = generator with an hourly `p_max_pu` profile; lines and links both connect agents.
+- `from_pandapower(pp_net, profiles)` converts a pandapower net + absolute MW profiles per table
+  (`"load"`, `"sgen"`): gen → thermal 0…`max_p_mw` (no unit commitment), sgen → renewable, costs
+  from `poly_cost`; lines and trafos (unless an open switch cuts them) and closed bus–bus switches
+  connect buses. NaN profiles raise. `load_simbench(code)` → `(pp_net, hourly profiles)` for a
+  SimBench grid (local-time labels replaced by a regular 15-min index before averaging).
+- Both converters drop buses without components; lines through them are bridged
+  (`bridge_lines`), so dropping a transit bus does not split the grid.
 - Source-independent preparation on the `Network` (`network.prepare`): `drop_unusable_units`,
   `add_quadratic_cost(net, k, band)` (c₂ = k·c₁/p_nom on thermal units with c₁ > 0; renewables,
   storage and free thermal units get c₂ = band/(2·p_nom); `k = band = 0` = linear),

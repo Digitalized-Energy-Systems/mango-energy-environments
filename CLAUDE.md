@@ -14,7 +14,7 @@ Whenever new code is written here, first invoke the ponytail skill (`ponytail:po
   agents to network elements (one component or a whole bus), network sources converted into backend networks (e.g.
   PyPSA → pandapower), generic preparation steps (cost model, slack detection, profiles).
 - **Preparation is separate from environments** (2026-11-03): `network/` converts any source
-  (`from_pypsa`, later `from_pandapower`) into the common `Network` and prepares it with
+  (`from_pypsa`, `from_pandapower` + `load_simbench`) into the common `Network` and prepares it with
   source-independent steps (`network/prepare.py`); environments only run a prepared `Network` and
   never contain conversion or preparation code. Backends that need their own data model get a
   converter from `Network` (`network/pandapower.py`: `to_pandapower` for `PowerSystemsBehavior`).
