@@ -18,16 +18,18 @@ source network (PyPSA, pandapower/SimBench, ...) → from_<source>() → prepare
 - `from_pypsa(pypsa.Network(path))` converts a PyPSA network (install extra `[pypsa]`):
   renewable = generator with an hourly `p_max_pu` profile; lines and links both connect agents.
 - `from_pandapower(pp_net, profiles)` converts a pandapower net + absolute MW profiles per table
-  (`"load"`, `"sgen"`): gen → thermal 0…`max_p_mw` (no unit commitment), sgen → renewable, costs
+  (`"load"`, `"sgen"`): gen → thermal 0…`max_p_mw` (no unit commitment), sgen → renewable
+  (fuel-fired biomass sgen → thermal 0…profile, as in `from_pypsa`), costs
   from `poly_cost`; lines and trafos (unless an open switch cuts them) and closed bus–bus switches
   connect buses. NaN profiles raise. `load_simbench(code)` → `(pp_net, hourly profiles)` for a
   SimBench grid (local-time labels replaced by a regular 15-min index before averaging).
 - Both converters drop buses without components; lines through them are bridged
   (`bridge_lines`), so dropping a transit bus does not split the grid.
 - Source-independent preparation on the `Network` (`network.prepare`): `drop_unusable_units`,
-  `add_quadratic_cost(net, k, band)` (c₂ = k·c₁/p_nom on thermal units with c₁ > 0; renewables,
-  storage and free thermal units get c₂ = band/(2·p_nom); `k = band = 0` = linear),
-  `set_storage_defaults(net, max_hours, soc_initial)`.
+  `add_quadratic_cost(net, k, band, band_kinds)` (c₂ = k·c₁/p_nom on thermal units with c₁ > 0;
+  the other units of a kind in `band_kinds` — default renewables, storage and free thermal — get
+  c₂ = band/(2·p_nom), the rest c₂ = 0; `k = band = 0` = linear),
+  `set_storage_defaults(net, max_hours, soc_initial, marginal_cost)` (per-carrier storage c₁).
 - PyPSA-only steps for building dataset files (`network.pypsa`): `scale_to_targets(n, {carrier: MW})`,
   `keep_buses(n, buses)` (cut out a region).
 - `save_network(net, path, meta)` / `load_network(path)`: a prepared `Network` as NetCDF (`.nc`;
