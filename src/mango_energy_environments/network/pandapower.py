@@ -27,6 +27,9 @@ _PP_IGNORED = {
     *("ext_grid", "storage", "trafo3w", "impedance", "dcline", "ward", "xward"),
     *("shunt", "asymmetric_load", "asymmetric_sgen", "motor"),
 }
+# sgen types that are fuel-fired, hence dispatchable: thermal, as in from_pypsa (biomass has no
+# p_max_pu profile there); decided 2026-11-10 (ESB S1 plan Q-R5)
+_THERMAL_SGEN_TYPES = {"biomass"}
 
 
 def from_pandapower(pp_net, profiles: dict[str, pd.DataFrame]) -> Network:
@@ -38,7 +41,8 @@ def from_pandapower(pp_net, profiles: dict[str, pd.DataFrame]) -> Network:
     bus id = pandapower bus index as str.
 
     - gen → thermal, 0 … ``max_p_mw`` (``min_p_mw`` and gen profiles ignored: no unit
-      commitment); sgen → renewable, 0 … profile; load → demand profile.
+      commitment); sgen → renewable, 0 … profile (biomass sgen → thermal, 0 … profile);
+      load → demand profile.
     - cost (c₁, c₂) from ``poly_cost`` (``cp1_eur_per_mw``, ``cp2_eur_per_mw2``), else 0.
     - connections: lines and trafos (unless an open switch cuts them) and closed bus–bus switches. Buses without components are
       dropped; connections through them are bridged (``bridge_lines``, as in ``from_pypsa``).
@@ -87,7 +91,7 @@ def from_pandapower(pp_net, profiles: dict[str, pd.DataFrame]) -> Network:
         add(
             "sgen",
             idx,
-            RENEWABLE,
+            THERMAL if g.get("type") in _THERMAL_SGEN_TYPES else RENEWABLE,
             zero,
             p_max,
             {"carrier": g.get("type"), "p_nom": float(p_max.max())},

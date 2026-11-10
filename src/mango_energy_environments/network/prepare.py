@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .model import LOAD, STORAGE, THERMAL, Network
+from .model import LOAD, RENEWABLE, STORAGE, THERMAL, Network
 
 __all__ = ["drop_unusable_units", "add_quadratic_cost", "set_storage_defaults"]
 
@@ -26,15 +26,22 @@ def drop_unusable_units(net: Network, storage_carriers: tuple[str, ...] = ()) ->
             del net.components[cid]
 
 
-def add_quadratic_cost(net: Network, k: float, band: float = 0.0) -> None:
+def add_quadratic_cost(
+    net: Network,
+    k: float,
+    band: float = 0.0,
+    band_kinds: tuple[str, ...] = (RENEWABLE, STORAGE, THERMAL),
+) -> None:
     """Set the quadratic cost coefficient c₂ (c₁ is kept). Overwrites existing values (idempotent).
 
     - thermal units with c₁ > 0: c₂ = k·c₁/p_nom — the marginal cost c₁ + 2·c₂·p rises from c₁
       at zero output to (1 + 2k)·c₁ at p_nom;
-    - renewables, storage and thermal units with c₁ ≤ 0: c₂ = band/(2·p_nom) — the marginal cost
-      rises by *band* (€/MWh) from zero to full output (storage: on its net power). This gives
-      price-responding algorithms a unique answer to a price; it is a modelling device, not a
-      physical cost. Keep *band* below the cheapest thermal c₁ so merit order is unchanged.
+    - all other units whose kind is in *band_kinds* (default: renewables, storage and thermal
+      units with c₁ ≤ 0): c₂ = band/(2·p_nom) — the marginal cost rises by *band* (€/MWh) from
+      zero to full output (storage: on its net power). This gives price-responding algorithms a
+      unique answer to a price; it is a modelling device, not a physical cost. Keep *band* below
+      the cheapest thermal c₁ so merit order is unchanged;
+    - the rest: c₂ = 0.
 
     ``k = 0`` and ``band = 0`` give the linear cost model.
     """
@@ -46,8 +53,10 @@ def add_quadratic_cost(net: Network, k: float, band: float = 0.0) -> None:
             c2 = 0.0
         elif c.kind == THERMAL and c1 > 0:
             c2 = k * c1 / p_nom
-        else:
+        elif c.kind in band_kinds:
             c2 = band / (2 * p_nom)
+        else:
+            c2 = 0.0
         c.cost = (c1, c2)
 
 

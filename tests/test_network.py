@@ -153,6 +153,10 @@ def test_curvature_band(net):
     assert c["pv"].cost == (0.01, pytest.approx(1.0 / 100))
     assert c["bat"].cost[1] == pytest.approx(1.0 / 8)
     assert c["coal"].cost == (0.0, pytest.approx(1.0 / 200))
+    # band only on storage (renewables + free thermal are pre-dispatched in ESB): others c₂ = 0
+    add_quadratic_cost(net, k=0.11, band=1.0, band_kinds=(STORAGE,))
+    assert c["bat"].cost[1] == pytest.approx(1.0 / 8)
+    assert c["pv"].cost[1] == 0 and c["coal"].cost[1] == 0
     add_quadratic_cost(net, k=0.0, band=0.0)  # back to the linear model
     assert all(x.cost[1] == 0 for x in c.values())
 
@@ -234,6 +238,7 @@ def test_from_pandapower(caplog):
     )
     pp.create_poly_cost(n, g, "gen", cp1_eur_per_mw=27.3)
     pp.create_sgen(n, b[2], 10.0, name="wind", type="wind onshore")
+    pp.create_sgen(n, b[2], 6.0, name="bio", type="biomass")  # fuel-fired → thermal
     pp.create_load(n, b[3], 80.0, name="load")
     pp.create_load(n, b[1], 10.0, name="static", scaling=0.5)
     pp.create_ext_grid(n, b[4])
@@ -255,6 +260,7 @@ def test_from_pandapower(caplog):
     )  # min_p_mw ignored (no unit commitment)
     assert c["coal"].p_max.tolist() == [300.0] * T
     assert c["wind"].kind == RENEWABLE and c["wind"].p_max.tolist() == [0.0, 5.0, 10.0]
+    assert c["bio"].kind == THERMAL and c["bio"].p_max.tolist() == [6.0] * T
     assert c["load"].kind == LOAD and c["load"].p_max.tolist() == [70.0, 80.0, 90.0]
     assert c["static"].p_max.tolist() == [5.0] * T  # no profile column: p_mw × scaling
     assert sorted(net.lines) == [
