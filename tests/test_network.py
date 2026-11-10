@@ -127,6 +127,10 @@ def test_prepare(net):
     storage = [c["phs"].params, c["bat"].params]
     assert [p["max_hours"] for p in storage] == [6.0, 2.0]
     assert [p["state_of_charge_initial"] for p in storage] == [30.0, 4.0]
+    # per-carrier c₁ (e.g. an ageing cost); other carriers and c₂ untouched
+    c2 = c["bat"].cost[1]
+    set_storage_defaults(net, {}, marginal_cost={"battery": 11.0})
+    assert c["bat"].cost == (11.0, c2) and c["phs"].cost[0] == 0.0
 
 
 def test_prepare_is_idempotent(net):

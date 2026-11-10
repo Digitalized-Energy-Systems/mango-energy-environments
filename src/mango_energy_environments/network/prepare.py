@@ -61,10 +61,14 @@ def add_quadratic_cost(
 
 
 def set_storage_defaults(
-    net: Network, max_hours: dict[str, float], soc_initial: float | None = None
+    net: Network,
+    max_hours: dict[str, float],
+    soc_initial: float | None = None,
+    marginal_cost: dict[str, float] | None = None,
 ) -> None:
-    """Set ``max_hours`` per storage carrier (others keep theirs) and, if given, the initial
-    state of charge as a fraction of the energy capacity (p_nom · max_hours)."""
+    """Set ``max_hours`` per storage carrier (others keep theirs), if given the initial state of
+    charge as a fraction of the energy capacity (p_nom · max_hours), and the linear cost c₁ per
+    carrier from *marginal_cost* (others keep theirs; c₂ is left as is)."""
     for c in net.components.values():
         if c.kind != STORAGE:
             continue
@@ -72,3 +76,5 @@ def set_storage_defaults(
         p["max_hours"] = max_hours.get(p.get("carrier"), p["max_hours"])
         if soc_initial is not None:
             p["state_of_charge_initial"] = soc_initial * p["p_nom"] * p["max_hours"]
+        if marginal_cost and p.get("carrier") in marginal_cost:
+            c.cost = (marginal_cost[p["carrier"]], c.cost[1])
