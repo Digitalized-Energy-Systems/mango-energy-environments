@@ -1,7 +1,7 @@
 """PyPSA source: convert a ``pypsa.Network`` into a :class:`Network`.
 
-Also two PyPSA-only steps for building dataset files (they need PyPSA data such as
-``p_nom_max`` and write back a PyPSA network): ``scale_to_targets``, ``keep_buses``.
+Also a PyPSA-only step for building dataset files (it writes back a PyPSA network):
+``keep_buses``.
 """
 
 from __future__ import annotations
@@ -9,13 +9,11 @@ from __future__ import annotations
 import logging
 import re
 
-import numpy as np
-
 from .model import LOAD, RENEWABLE, STORAGE, THERMAL, Component, Network, bridge_lines
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["from_pypsa", "scale_to_targets", "keep_buses"]
+__all__ = ["from_pypsa", "keep_buses"]
 
 # PyPSA component types the converter maps (or that only hold catalogue data).
 _PYPSA_MAPPED = {
@@ -96,31 +94,6 @@ def from_pypsa(n) -> Network:
         [*zip(n.lines.bus0, n.lines.bus1), *zip(n.links.bus0, n.links.bus1)], used
     )
     return Network(n.snapshots, components, lines)
-
-
-def scale_to_targets(n, targets: dict[str, float]) -> None:
-    """Raise the total ``p_nom`` per carrier (generators and storage units) to *targets* [MW].
-
-    The increase is spread in proportion to each unit's ``p_nom_max − p_nom`` headroom (evenly
-    when the total headroom is zero or infinite). Carriers already at or above their target are
-    left alone. Generators and storage units are scaled separately, so a carrier must belong to
-    only one of them (else both are raised to the target).
-    """
-    for carrier, target in targets.items():
-        for component, df in (
-            ("Generator", n.generators),
-            ("StorageUnit", n.storage_units),
-        ):
-            sel = df.index[df.carrier == carrier]
-            current = df.loc[sel, "p_nom"].sum()
-            if len(sel) == 0 or current >= target:
-                continue
-            headroom = (df.loc[sel, "p_nom_max"] - df.loc[sel, "p_nom"]).clip(lower=0)
-            total = headroom.sum()
-            weights = headroom / total if 0 < total < np.inf else 1.0 / len(sel)
-            n.components[component].static.loc[sel, "p_nom"] += (
-                target - current
-            ) * weights
 
 
 def keep_buses(n, buses) -> None:

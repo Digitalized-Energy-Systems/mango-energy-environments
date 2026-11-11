@@ -92,7 +92,6 @@ from mango_energy_environments.network import (
     load_network,
     load_simbench,
     save_network,
-    scale_to_targets,
     set_storage_defaults,
     to_pandapower,
 )
@@ -135,7 +134,6 @@ __all__ = [
     "drop_unusable_units",
     "add_quadratic_cost",
     "set_storage_defaults",
-    "scale_to_targets",
     "keep_buses",
     "to_pandapower",
     "save_network",

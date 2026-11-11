@@ -18,7 +18,6 @@ from mango_energy_environments.network import (
     keep_buses,
     load_network,
     save_network,
-    scale_to_targets,
     set_storage_defaults,
 )
 
@@ -163,23 +162,6 @@ def test_curvature_band(net):
     assert c["pv"].cost[1] == 0 and c["coal"].cost[1] == 0
     add_quadratic_cost(net, k=0.0, band=0.0)  # back to the linear model
     assert all(x.cost[1] == 0 for x in c.values())
-
-
-def test_scale_to_targets():
-    n = pypsa.Network()
-    n.add("Bus", "b")
-    n.add("Generator", "w1", bus="b", carrier="onwind", p_nom=10, p_nom_max=40)
-    n.add("Generator", "w2", bus="b", carrier="onwind", p_nom=10, p_nom_max=20)
-    n.add("Generator", "pv", bus="b", carrier="solar", p_nom=50)
-    n.add("StorageUnit", "s1", bus="b", carrier="battery", p_nom=1, p_nom_max=np.inf)
-    n.add("StorageUnit", "s2", bus="b", carrier="battery", p_nom=1, p_nom_max=np.inf)
-    scale_to_targets(n, {"onwind": 60, "solar": 30, "battery": 10})
-    # +40 MW spread by headroom 30:10
-    assert n.generators.p_nom["w1"] == pytest.approx(40)
-    assert n.generators.p_nom["w2"] == pytest.approx(20)
-    assert n.generators.p_nom["pv"] == 50  # already above target
-    # no finite headroom: split evenly
-    np.testing.assert_allclose(n.storage_units.p_nom, [5, 5])
 
 
 def test_keep_buses():

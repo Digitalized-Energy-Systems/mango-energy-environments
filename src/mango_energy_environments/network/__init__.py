@@ -15,7 +15,7 @@ from .model import (
 )
 from .pandapower import from_pandapower, to_pandapower
 from .prepare import add_quadratic_cost, drop_unusable_units, set_storage_defaults
-from .pypsa import from_pypsa, keep_buses, scale_to_targets
+from .pypsa import from_pypsa, keep_buses
 from .simbench import load_simbench
 
 __all__ = [
@@ -30,7 +30,6 @@ __all__ = [
     "add_quadratic_cost",
     "set_storage_defaults",
     "from_pypsa",
-    "scale_to_targets",
     "keep_buses",
     "from_pandapower",
     "load_simbench",

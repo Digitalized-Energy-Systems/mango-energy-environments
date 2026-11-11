@@ -30,8 +30,8 @@ source network (PyPSA, pandapower/SimBench, ...) → from_<source>() → prepare
   the other units of a kind in `band_kinds` — default renewables, storage and free thermal — get
   c₂ = band/(2·p_nom), the rest c₂ = 0; `k = band = 0` = linear),
   `set_storage_defaults(net, max_hours, soc_initial, marginal_cost)` (per-carrier storage c₁).
-- PyPSA-only steps for building dataset files (`network.pypsa`): `scale_to_targets(n, {carrier: MW})`,
-  `keep_buses(n, buses)` (cut out a region).
+- PyPSA-only step for building dataset files (`network.pypsa`): `keep_buses(n, buses)` (cut out a
+  region).
 - `save_network(net, path, meta)` / `load_network(path)`: a prepared `Network` as NetCDF (`.nc`;
   arrays zlib-compressed, per-component params as JSON, `meta` e.g. the recipe as JSON attribute),
   so a network is prepared once and reused by every run.
